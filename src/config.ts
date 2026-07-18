@@ -13,7 +13,7 @@ export interface HardcodedUser {
 
 export const USER_A: HardcodedUser = {
   id: 'user_a',
-  name: 'Alex',
+  name: 'A',
   avatar: '🎒',
   color: 'text-indigo-700',
   accentColor: 'indigo',
@@ -23,7 +23,7 @@ export const USER_A: HardcodedUser = {
 
 export const USER_B: HardcodedUser = {
   id: 'user_b',
-  name: 'Blake',
+  name: 'G',
   avatar: '🧠',
   color: 'text-rose-800',
   accentColor: 'rose',

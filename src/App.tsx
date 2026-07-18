@@ -17,7 +17,7 @@ export default function App() {
   const [activeUserId, setActiveUserId] = useState<string>(() => {
     return localStorage.getItem('study_sync_user_id') || USER_A.id;
   });
-  const [selectedLoginUser, setSelectedLoginUser] = useState<string>(USER_A.id);
+  const [enteredUsername, setEnteredUsername] = useState('');
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
 
@@ -43,15 +43,22 @@ export default function App() {
   // Handle Authentication submit
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const usernameNorm = enteredUsername.trim().toUpperCase();
+    if (usernameNorm !== 'GN' && usernameNorm !== 'AVSC') {
+      setPinError('Invalid Username. Access is restricted to GN and AVSC.');
+      return;
+    }
     if (enteredPin === '2009') {
+      const selectedId = usernameNorm === 'GN' ? USER_A.id : USER_B.id;
       setIsAuthenticated(true);
-      setActiveUserId(selectedLoginUser);
+      setActiveUserId(selectedId);
       localStorage.setItem('study_sync_auth_v2', 'true');
-      localStorage.setItem('study_sync_user_id', selectedLoginUser);
+      localStorage.setItem('study_sync_user_id', selectedId);
       setPinError('');
       setEnteredPin('');
+      setEnteredUsername('');
     } else {
-      setPinError('Incorrect Secret PIN. Please check with your study partner.');
+      setPinError('Incorrect Secret PIN. Please check with the other sync user.');
     }
   };
 
@@ -105,9 +112,6 @@ export default function App() {
       if (key === 'p') setActiveTab('personal');
       if (key === 's') setActiveTab('shared');
       if (key === 'm') setActiveTab('matches');
-      if (key === 'u') {
-        setActiveUserId((prev) => (prev === USER_A.id ? USER_B.id : USER_A.id));
-      }
       if (key === 'a') {
         handleOpenAddModal();
       }
@@ -160,6 +164,25 @@ export default function App() {
           timestamp: new Date().toISOString(),
           unread: true,
           type: 'success',
+        });
+      }
+
+      // Check for @A and @G mentions
+      const findMentions = (text: string) => {
+        const mentions = [];
+        if (text.includes('@A')) mentions.push('A');
+        if (text.includes('@G')) mentions.push('G');
+        return mentions;
+      };
+
+      const allText = `${eventData.title} ${eventData.notes || ''} ${eventData.topic || ''}`;
+      const detected = findMentions(allText);
+      for (const user of detected) {
+        await addDoc(collection(db, 'notifications'), {
+          text: `🔔 Mention: ${activeUser.name} tagged @${user} in slot "${eventData.title}": "${eventData.notes || 'Check this block!'}"`,
+          timestamp: new Date().toISOString(),
+          unread: true,
+          type: 'alert',
         });
       }
     } catch (err) {
@@ -217,110 +240,7 @@ export default function App() {
     }
   };
 
-  // Auto-seed Sample Data Routine
-  const handleSeedData = async () => {
-    const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
-    
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
-    const sat = new Date();
-    sat.setDate(sat.getDate() + (6 - sat.getDay())); // Saturday of this week
-    const satStr = sat.toISOString().slice(0, 10);
-
-    const sampleEvents = [
-      // Alex (User A)
-      {
-        userId: 'user_a',
-        title: 'Chemistry Exam Prep',
-        type: 'studying',
-        start: `${todayStr}T15:00:00`,
-        end: `${todayStr}T17:00:00`,
-        recurrence: 'none',
-        timezone: 'UTC',
-        notes: 'Chapter 5 revision and mock tests.'
-      },
-      {
-        userId: 'user_a',
-        title: 'Review Window',
-        type: 'free',
-        start: `${tomorrowStr}T09:00:00`,
-        end: `${tomorrowStr}T12:00:00`,
-        recurrence: 'none',
-        timezone: 'UTC',
-        notes: 'Ready for joint math study.'
-      },
-      {
-        userId: 'user_a',
-        title: 'Weekend Available',
-        type: 'free',
-        start: `${satStr}T14:00:00`,
-        end: `${satStr}T17:00:00`,
-        recurrence: 'none',
-        timezone: 'UTC',
-      },
-
-      // Blake (User B)
-      {
-        userId: 'user_b',
-        title: 'Chemistry Group Prep',
-        type: 'studying',
-        start: `${todayStr}T15:00:00`,
-        end: `${todayStr}T17:00:00`,
-        recurrence: 'none',
-        timezone: 'UTC',
-      },
-      {
-        userId: 'user_b',
-        title: 'Math Study Session',
-        type: 'studying',
-        start: `${tomorrowStr}T09:00:00`,
-        end: `${tomorrowStr}T11:00:00`,
-        recurrence: 'none',
-        timezone: 'UTC',
-      },
-      {
-        userId: 'user_b',
-        title: 'Weekend Study Block',
-        type: 'free',
-        start: `${satStr}T14:00:00`,
-        end: `${satStr}T16:00:00`,
-        recurrence: 'none',
-        timezone: 'UTC',
-      }
-    ];
-
-    try {
-      for (const ev of sampleEvents) {
-        // Parse dates correctly using local system timezone offsets
-        const startISO = new Date(ev.start).toISOString();
-        const endISO = new Date(ev.end).toISOString();
-        
-        await addDoc(collection(db, 'events'), {
-          userId: ev.userId,
-          title: ev.title,
-          type: ev.type,
-          start: startISO,
-          end: endISO,
-          recurrence: ev.recurrence,
-          timezone: ev.timezone,
-          notes: ev.notes || '',
-          createdAt: new Date().toISOString(),
-        });
-      }
-
-      await addDoc(collection(db, 'notifications'), {
-        text: `🌱 Seeded sample calendar data for Alex and Blake. Overlapping slots are ready!`,
-        timestamp: new Date().toISOString(),
-        unread: true,
-        type: 'success',
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   // Render the Welcome PIN Authentication screen if not logged in
   if (!isAuthenticated) {
@@ -332,42 +252,34 @@ export default function App() {
           
           <div className="text-center space-y-2 mt-2">
             <span className="text-[10px] uppercase font-bold tracking-widest text-[#B59F74] font-mono block">
-              📚 Locked Partner Portal
+              📚 Locked Study Sync Portal
             </span>
             <h1 className="text-4xl font-serif font-black tracking-tight text-stone-900">
               Study Sync
             </h1>
             <p className="text-xs text-stone-500 font-serif italic max-w-xs mx-auto">
-              A private, real-time study ledger and scheduler for exactly two partners. Entered pin is synced.
+              A private, real-time study ledger and scheduler. Entered pin is synced.
             </p>
           </div>
 
           <form onSubmit={handleLoginSubmit} className="mt-8 space-y-6">
-            {/* Identity Select */}
+            {/* Username text input */}
             <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 font-mono">
-                Identify Yourself
+              <label htmlFor="username" className="block text-xs font-bold uppercase tracking-wider text-stone-500 font-mono">
+                Username
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                {USERS.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => setSelectedLoginUser(u.id)}
-                    className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1.5 cursor-pointer ${
-                      selectedLoginUser === u.id
-                        ? 'border-stone-800 bg-stone-50 text-stone-900 shadow-sm'
-                        : 'border-stone-200 bg-[#FAF9F6] text-stone-500 hover:border-stone-300'
-                    }`}
-                  >
-                    <span className="text-3xl">{u.avatar}</span>
-                    <span className="text-xs font-bold uppercase tracking-wide">{u.name}</span>
-                    <span className="text-[9px] text-stone-400 font-medium font-mono">
-                      {u.id === 'user_a' ? 'User 1' : 'User 2'}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <input
+                id="username"
+                type="text"
+                required
+                placeholder="Enter GN or AVSC"
+                value={enteredUsername}
+                onChange={(e) => {
+                  setEnteredUsername(e.target.value);
+                  setPinError('');
+                }}
+                className="w-full text-center text-sm font-mono bg-stone-50 border-2 border-[#D9D1C0] focus:border-stone-800 rounded-xl px-4 py-3 focus:outline-none transition"
+              />
             </div>
 
             {/* PIN Code entry */}
@@ -402,7 +314,7 @@ export default function App() {
               type="submit"
               className="w-full bg-stone-900 hover:bg-stone-800 active:bg-black text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-widest transition-all cursor-pointer shadow-md"
             >
-              Unlock Partner Portal
+              Unlock Study Sync Portal
             </button>
           </form>
 
@@ -433,7 +345,7 @@ export default function App() {
                 Study Sync
               </h1>
               <span className="text-[10px] font-bold text-[#A58D56] tracking-widest block uppercase font-mono mt-1">
-                Two-Partner Sync Engine
+                Study Sync Engine
               </span>
             </div>
           </div>
@@ -474,28 +386,6 @@ export default function App() {
               <span>{syncStatus}</span>
             </div>
 
-            {/* Switch Active User */}
-            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200">
-              <span className="text-[9px] font-bold uppercase text-stone-400 px-1.5 font-mono">Actor:</span>
-              <div className="flex gap-0.5">
-                {USERS.map((u) => (
-                  <button
-                    key={u.id}
-                    onClick={() => handleUserSwitch(u.id)}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
-                      activeUserId === u.id
-                        ? 'bg-white text-stone-900 shadow-sm border border-stone-200'
-                        : 'text-stone-400 hover:text-stone-700'
-                    }`}
-                    title={`Act as ${u.name}`}
-                  >
-                    <span>{u.avatar}</span>
-                    <span className="hidden md:inline text-[11px]">{u.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Help & Shortcuts toggles */}
             <button
               onClick={() => setShowShortcuts(true)}
@@ -530,7 +420,7 @@ export default function App() {
             <div>
               <p className="text-xs font-bold text-stone-400 uppercase tracking-widest font-mono">Currently viewing as</p>
               <p className="text-lg font-serif font-black text-stone-900">
-                {activeUser.name} <span className="text-xs font-sans font-normal text-stone-500">(Partner 1)</span>
+                {activeUser.name}
               </p>
             </div>
           </div>
@@ -539,24 +429,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Empty State Banner Offer */}
-        {events.length === 0 && (
-          <div className="p-5 rounded-xl border-2 border-dashed border-[#B59F74] bg-[#FDFCF7] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-[#B59F74]" />
-              <div>
-                <p className="text-sm font-bold text-stone-900 font-serif">Empty Study Sync Ledger! 📔</p>
-                <p className="text-xs text-stone-500">Seed sample scheduling data to instantly preview overlapping slots, side-by-side grids, and analytics.</p>
-              </div>
-            </div>
-            <button
-              onClick={handleSeedData}
-              className="px-5 py-2.5 rounded-lg bg-stone-950 hover:bg-stone-800 text-stone-100 text-xs font-black tracking-wider uppercase shadow-md cursor-pointer transition-all"
-            >
-              Seed Sample Schedules
-            </button>
-          </div>
-        )}
+
 
         {/* View Switch Stage */}
         <div className="transition-all duration-300">
@@ -618,7 +491,6 @@ export default function App() {
                 { keys: ['S'], label: 'Jump to Shared Blended Grid' },
                 { keys: ['M'], label: 'Jump to Match Overlaps Finder' },
                 { keys: ['A'], label: 'Quick Open Create Slot Form' },
-                { keys: ['U'], label: 'Switch Active Persona (Alex / Blake)' },
                 { keys: ['K'], label: 'Toggle Shortcuts list overlay' },
               ].map((sc, idx) => (
                 <div key={idx} className="flex justify-between items-center py-1 border-b border-stone-50">
@@ -652,7 +524,7 @@ export default function App() {
 
       {/* Footer Design Credits and shortcuts prompt */}
       <footer className="border-t-2 border-[#E3DEC3] py-8 text-center text-[10px] font-bold text-stone-400 uppercase tracking-widest bg-[#FAF9F6] font-mono">
-        <p>Study Sync Two-Person Scheduler Ledger • All Data Synced to Firestore</p>
+        <p>Study Sync Scheduler Ledger • All Data Synced to Firestore</p>
         <p className="mt-1.5 text-stone-300">Press <kbd className="bg-white border border-stone-200 text-stone-500 px-1.5 py-0.5 rounded text-[9px] mx-1 shadow-sm">K</kbd> for Keyboard shortcuts</p>
       </footer>
     </div>

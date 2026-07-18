@@ -1,10 +1,28 @@
-import React, { useState, useMemo } from 'react';
-import { CalendarEvent } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { CalendarEvent, CustomStudyGoal } from '../types';
 import { USERS, HardcodedUser, DAILY_STUDY_GOAL_HOURS } from '../config';
-import { db, doc, updateDoc } from '../lib/firebase';
-import { expandEvents, findMatches, getLocalDateString, formatDuration } from '../utils/calendarUtils';
+import { db, doc, updateDoc, collection, query, onSnapshot, addDoc } from '../lib/firebase';
+import { expandEvents, findMatches, getLocalDateString } from '../utils/calendarUtils';
 import { downloadICS } from '../utils/icsUtils';
-import { BookOpen, Calendar as CalendarIcon, Sparkles, Plus, Clock, TrendingUp, Flame, Download, CheckSquare, Square, Notebook } from 'lucide-react';
+import { 
+  BookOpen, 
+  Calendar as CalendarIcon, 
+  Sparkles, 
+  Plus, 
+  Clock, 
+  TrendingUp, 
+  Flame, 
+  Download, 
+  CheckSquare, 
+  Square, 
+  Notebook,
+  AlertCircle,
+  Pin
+} from 'lucide-react';
+
+import PomodoroTimer from './PomodoroTimer';
+import GoalsTracker from './GoalsTracker';
+import AISchedulerCoach from './AISchedulerCoach';
 
 interface DashboardProps {
   currentUser: HardcodedUser;
@@ -15,6 +33,20 @@ interface DashboardProps {
 
 export default function Dashboard({ currentUser, partner, events, onAddSlotClick }: DashboardProps) {
   const [activeTaskFilter, setActiveTaskFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [goals, setGoals] = useState<CustomStudyGoal[]>([]);
+
+  // Load study goals in real-time from Firestore
+  useEffect(() => {
+    const q = query(collection(db, 'goals'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: CustomStudyGoal[] = [];
+      snapshot.forEach((docSnapshot) => {
+        list.push({ ...docSnapshot.data(), id: docSnapshot.id } as CustomStudyGoal);
+      });
+      setGoals(list);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Expand events for the current week (Sunday to Saturday)
   const expandedEvents = useMemo(() => {
@@ -180,6 +212,59 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
     return list;
   }, [userEvents]);
 
+  // Extract mentions for the active user
+  const activeMentions = useMemo(() => {
+    const list: { id: string; title: string; text: string; timeStr: string; type: string }[] = [];
+    events.forEach((e) => {
+      const tag = `@${currentUser.name}`; // e.g. "@A" or "@G"
+      const matchesMention = 
+        (e.title && e.title.includes(tag)) ||
+        (e.notes && e.notes.includes(tag)) ||
+        (e.topic && e.topic.includes(tag));
+
+      if (matchesMention) {
+        const sTime = new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dStr = new Date(e.start).toLocaleDateString([], { month: 'short', day: 'numeric' });
+        list.push({
+          id: e.id,
+          title: e.title,
+          text: e.notes || 'Tag mentioned in scheduled study slot.',
+          timeStr: `${dStr} at ${sTime}`,
+          type: e.type,
+        });
+      }
+    });
+    return list;
+  }, [events, currentUser]);
+
+  // Increment Goal helper
+  const handleIncrementGoal = async (goalId: string, hours: number) => {
+    try {
+      const g = goals.find((x) => x.id === goalId);
+      if (!g) return;
+
+      const ref = doc(db, 'goals', goalId);
+      const newHours = Math.min(g.targetHours, g.currentHours + hours);
+      const isNowCompleted = newHours >= g.targetHours && !g.completed;
+
+      await updateDoc(ref, {
+        currentHours: newHours,
+        completed: isNowCompleted ? true : g.completed,
+      });
+
+      if (isNowCompleted) {
+        await addDoc(collection(db, 'notifications'), {
+          text: `🏆 Target Met! ${currentUser.name} successfully finalized the study goal: "${g.title}"! Excellent!`,
+          timestamp: new Date().toISOString(),
+          unread: true,
+          type: 'success',
+        });
+      }
+    } catch (err) {
+      console.error('Error incrementing goal:', err);
+    }
+  };
+
   // Handle Export ICS
   const handleExportICS = () => {
     downloadICS(userEvents, currentUser.name);
@@ -232,6 +317,33 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
           </button>
         </div>
       </div>
+
+      {/* Active Mentions Board - Paper sticky notes aesthetic */}
+      {activeMentions.length > 0 && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="p-4 rounded-xl border-2 border-amber-200 bg-amber-50/50 space-y-3">
+            <h4 className="text-xs font-bold text-amber-900 uppercase tracking-widest font-mono flex items-center gap-1.5">
+              <Pin className="h-4 w-4 text-amber-600 rotate-12" />
+              📌 Mentions Desk (@{currentUser.name})
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {activeMentions.map((mention) => (
+                <div 
+                  key={mention.id}
+                  className="p-3.5 rounded-xl border-2 border-[#EADBB8] bg-amber-100/60 shadow-[3px_3px_0px_0px_rgba(217,209,192,0.2)] hover:rotate-1 hover:scale-101 transition-all duration-300 relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-8 h-8 bg-amber-200/50 rounded-bl-xl pointer-events-none" />
+                  <span className="text-[9px] text-[#A58D56] font-mono font-bold block">{mention.timeStr}</span>
+                  <p className="text-xs font-black text-stone-900 mt-1 truncate">{mention.title}</p>
+                  <p className="text-xs text-stone-700 italic font-serif leading-relaxed mt-1.5 line-clamp-2">
+                    "{mention.text}"
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -319,143 +431,164 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
 
       {/* Two-Column Mid-Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Today's Schedule timeline */}
-        <div className="lg:col-span-2 p-5 rounded-xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.3)] space-y-4">
-          <div className="flex items-center justify-between border-b-2 border-stone-100 pb-3">
-            <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider flex items-center gap-2 font-mono">
-              <CalendarIcon className="h-4 w-4 text-stone-500" />
-              Your Study Timeline Today
-            </h3>
-            <span className="text-xs font-serif italic text-stone-500">
-              {new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-
-          <div className="space-y-4">
-            {todaySchedule.length === 0 ? (
-              <div className="py-12 text-center rounded-xl border-2 border-dashed border-stone-200 bg-stone-50/50">
-                <Notebook className="h-8 w-8 text-stone-400 mx-auto mb-2" />
-                <p className="text-xs text-stone-500 font-serif italic">Your journal has no slots booked for today.</p>
-                <button
-                  onClick={onAddSlotClick}
-                  className="mt-3 text-xs font-bold text-stone-700 hover:text-stone-900 underline transition cursor-pointer"
-                >
-                  Create a study block +
-                </button>
-              </div>
-            ) : (
-              todaySchedule.map((item) => {
-                const sTime = new Date(item.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const eTime = new Date(item.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                let typeColor = 'border-emerald-200 bg-emerald-50/40 text-emerald-950';
-                if (item.type === 'studying') typeColor = 'border-sky-200 bg-sky-50/40 text-sky-950';
-                if (item.type === 'busy') typeColor = 'border-stone-200 bg-stone-50 text-stone-900';
-                if (item.type === 'maybe') typeColor = 'border-amber-200 bg-amber-50/40 text-amber-950';
-
-                const totalTasks = item.checklist?.length || 0;
-                const doneTasks = item.checklist?.filter((t) => t.done).length || 0;
-
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-4 rounded-xl border-2 transition ${typeColor} space-y-3 shadow-xs`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-black">{item.title}</span>
-                          {item.topic && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider font-mono bg-white border px-2 py-0.5 rounded text-stone-600">
-                              📚 {item.topic}
-                            </span>
-                          )}
-                        </div>
-                        {item.notes && <p className="text-xs text-stone-600 italic font-serif leading-relaxed">{item.notes}</p>}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs font-black block font-mono">{sTime} - {eTime}</span>
-                        <span className="text-[9px] uppercase font-bold tracking-widest font-mono opacity-80">{item.type}</span>
-                      </div>
-                    </div>
-
-                    {/* Interactive Checklist directly on the Dashboard! */}
-                    {item.checklist && item.checklist.length > 0 && (
-                      <div className="border-t border-stone-200/50 pt-3 mt-2 space-y-1.5 bg-white/60 p-3 rounded-lg border">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 font-mono flex justify-between">
-                          <span>🎯 Target Checklist Tasks</span>
-                          <span>{doneTasks}/{totalTasks} Done</span>
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1.5">
-                          {item.checklist.map((task) => (
-                            <button
-                              key={task.id}
-                              onClick={() => handleToggleTask(item.id, task.id, task.done)}
-                              className="flex items-center gap-2 text-left text-xs text-stone-700 hover:text-stone-950 transition-all cursor-pointer p-1 rounded hover:bg-white"
-                            >
-                              {task.done ? (
-                                <CheckSquare className="h-4 w-4 text-indigo-700 shrink-0" />
-                              ) : (
-                                <Square className="h-4 w-4 text-stone-400 shrink-0" />
-                              )}
-                              <span className={`truncate ${task.done ? 'line-through text-stone-400' : ''}`}>
-                                {task.text}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Right: Weekly Heatmap and Statistics */}
-        <div className="p-5 rounded-xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.3)] space-y-4">
-          <div className="border-b-2 border-stone-100 pb-3">
-            <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider flex items-center gap-2 font-mono">
-              <TrendingUp className="h-4 w-4 text-stone-500" />
-              Weekly Heatmap
-            </h3>
-          </div>
-
-          <p className="text-xs text-stone-500 font-serif italic leading-relaxed">
-            Pencil-filled blocks indicating hours studied. Aim to complete your daily {DAILY_STUDY_GOAL_HOURS}h goals.
-          </p>
-
-          <div className="grid grid-cols-7 gap-2 pt-2">
-            {studyHeatmap.map((day) => {
-              // Decide intensity class
-              let colorClass = 'bg-stone-50 border-stone-200 text-stone-400';
-              if (day.hours > 0 && day.hours <= 2) colorClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
-              if (day.hours > 2 && day.hours <= 4) colorClass = 'bg-sky-50 border-sky-200 text-sky-800';
-              if (day.hours > 4) colorClass = 'bg-indigo-900 border-indigo-700 text-white';
-
-              return (
-                <div key={day.dateStr} className="flex flex-col items-center gap-1.5" title={`${day.label}: ${day.hours} study hours`}>
-                  <div className={`h-11 w-full rounded-lg border-2 flex items-center justify-center text-xs font-black transition-all shadow-xs ${colorClass}`}>
-                    {day.hours > 0 ? `${Math.round(day.hours)}` : '•'}
-                  </div>
-                  <span className="text-[10px] text-stone-400 font-bold uppercase font-mono">{day.dayName}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Quick Info details */}
-          <div className="mt-4 pt-4 border-t-2 border-stone-100 space-y-2 text-xs font-mono">
-            <div className="flex items-center justify-between text-stone-500">
-              <span>Goal Consistency Status:</span>
-              <span className={`font-bold uppercase ${studyStreak > 0 ? 'text-amber-800' : 'text-stone-400'}`}>
-                {studyStreak > 0 ? '🔥 Active Streak' : '😴 Rest State'}
+        {/* Left Column (2/3 width) - Timeline, Goals and AI Coach */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Timeline */}
+          <div className="p-5 rounded-xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.3)] space-y-4">
+            <div className="flex items-center justify-between border-b-2 border-stone-100 pb-3">
+              <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider flex items-center gap-2 font-mono">
+                <CalendarIcon className="h-4 w-4 text-stone-500" />
+                Your Study Timeline Today
+              </h3>
+              <span className="text-xs font-serif italic text-stone-500">
+                {new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
               </span>
             </div>
-            <div className="flex items-center justify-between text-stone-500">
-              <span>Total Hours Synced:</span>
-              <span className="font-bold text-stone-900">{weeklyStudyHours} hrs</span>
+
+            <div className="space-y-4">
+              {todaySchedule.length === 0 ? (
+                <div className="py-12 text-center rounded-xl border-2 border-dashed border-stone-200 bg-stone-50/50">
+                  <Notebook className="h-8 w-8 text-stone-400 mx-auto mb-2" />
+                  <p className="text-xs text-stone-500 font-serif italic">Your journal has no slots booked for today.</p>
+                  <button
+                    onClick={onAddSlotClick}
+                    className="mt-3 text-xs font-bold text-stone-700 hover:text-stone-900 underline transition cursor-pointer"
+                  >
+                    Create a study block +
+                  </button>
+                </div>
+              ) : (
+                todaySchedule.map((item) => {
+                  const sTime = new Date(item.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const eTime = new Date(item.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                  let typeColor = 'border-emerald-200 bg-emerald-50/40 text-emerald-950';
+                  if (item.type === 'studying') typeColor = 'border-sky-200 bg-sky-50/40 text-sky-950';
+                  if (item.type === 'busy') typeColor = 'border-stone-200 bg-stone-50 text-stone-900';
+                  if (item.type === 'maybe') typeColor = 'border-amber-200 bg-amber-50/40 text-amber-950';
+
+                  const totalTasks = item.checklist?.length || 0;
+                  const doneTasks = item.checklist?.filter((t) => t.done).length || 0;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-4 rounded-xl border-2 transition ${typeColor} space-y-3 shadow-xs`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-black">{item.title}</span>
+                            {item.topic && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider font-mono bg-white border px-2 py-0.5 rounded text-stone-600">
+                                📚 {item.topic}
+                              </span>
+                            )}
+                          </div>
+                          {item.notes && <p className="text-xs text-stone-600 italic font-serif leading-relaxed">{item.notes}</p>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-black block font-mono">{sTime} - {eTime}</span>
+                          <span className="text-[9px] uppercase font-bold tracking-widest font-mono opacity-80">{item.type}</span>
+                        </div>
+                      </div>
+
+                      {/* Interactive Checklist directly on the Dashboard! */}
+                      {item.checklist && item.checklist.length > 0 && (
+                        <div className="border-t border-stone-200/50 pt-3 mt-2 space-y-1.5 bg-white/60 p-3 rounded-lg border">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 font-mono flex justify-between">
+                            <span>🎯 Target Checklist Tasks</span>
+                            <span>{doneTasks}/{totalTasks} Done</span>
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1.5">
+                            {item.checklist.map((task) => (
+                              <button
+                                key={task.id}
+                                onClick={() => handleToggleTask(item.id, task.id, task.done)}
+                                className="flex items-center gap-2 text-left text-xs text-stone-700 hover:text-stone-950 transition-all cursor-pointer p-1 rounded hover:bg-white"
+                              >
+                                {task.done ? (
+                                  <CheckSquare className="h-4 w-4 text-indigo-700 shrink-0" />
+                                ) : (
+                                  <Square className="h-4 w-4 text-stone-400 shrink-0" />
+                                )}
+                                <span className={`truncate ${task.done ? 'line-through text-stone-400' : ''}`}>
+                                  {task.text}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Synchronized Study Goals Tracker */}
+          <div className="p-5 rounded-xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.3)]">
+            <GoalsTracker currentUser={currentUser} partner={partner} goals={goals} />
+          </div>
+
+          {/* AI Study Planner Coach */}
+          <AISchedulerCoach currentUser={currentUser} partner={partner} />
+        </div>
+
+        {/* Right Column (1/3 width) - Pomodoro and Heatmap */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Pomodoro Timer */}
+          <PomodoroTimer 
+            currentUser={currentUser} 
+            partner={partner} 
+            goals={goals} 
+            onIncrementGoal={handleIncrementGoal} 
+          />
+
+          {/* Heatmap */}
+          <div className="p-5 rounded-xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.3)] space-y-4">
+            <div className="border-b-2 border-stone-100 pb-3">
+              <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider flex items-center gap-2 font-mono">
+                <TrendingUp className="h-4 w-4 text-stone-500" />
+                Weekly Heatmap
+              </h3>
+            </div>
+
+            <p className="text-xs text-stone-500 font-serif italic leading-relaxed">
+              Pencil-filled blocks indicating hours studied. Aim to complete your daily {DAILY_STUDY_GOAL_HOURS}h goals.
+            </p>
+
+            <div className="grid grid-cols-7 gap-2 pt-2">
+              {studyHeatmap.map((day) => {
+                let colorClass = 'bg-stone-50 border-stone-200 text-stone-400';
+                if (day.hours > 0 && day.hours <= 2) colorClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
+                if (day.hours > 2 && day.hours <= 4) colorClass = 'bg-sky-50 border-sky-200 text-sky-800';
+                if (day.hours > 4) colorClass = 'bg-indigo-900 border-indigo-700 text-white';
+
+                return (
+                  <div key={day.dateStr} className="flex flex-col items-center gap-1.5" title={`${day.label}: ${day.hours} study hours`}>
+                    <div className={`h-11 w-full rounded-lg border-2 flex items-center justify-center text-xs font-black transition-all shadow-xs ${colorClass}`}>
+                      {day.hours > 0 ? `${Math.round(day.hours)}` : '•'}
+                    </div>
+                    <span className="text-[10px] text-stone-400 font-bold uppercase font-mono">{day.dayName}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quick Info details */}
+            <div className="mt-4 pt-4 border-t-2 border-stone-100 space-y-2 text-xs font-mono">
+              <div className="flex items-center justify-between text-stone-500">
+                <span>Goal Consistency Status:</span>
+                <span className={`font-bold uppercase ${studyStreak > 0 ? 'text-amber-800' : 'text-stone-400'}`}>
+                  {studyStreak > 0 ? '🔥 Active Streak' : '😴 Rest State'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-stone-500">
+                <span>Total Hours Synced:</span>
+                <span className="font-bold text-stone-900">{weeklyStudyHours} hrs</span>
+              </div>
             </div>
           </div>
         </div>

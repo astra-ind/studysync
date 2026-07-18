@@ -29,6 +29,18 @@ export interface StudyGoal {
   streakDays: number;
 }
 
+export interface CustomStudyGoal {
+  id: string;
+  userId: string;
+  title: string;
+  targetHours: number;
+  currentHours: number;
+  category: string;
+  completed: boolean;
+  deadline?: string;
+  createdAt: string;
+}
+
 export interface NotificationMsg {
   id: string;
   text: string;
