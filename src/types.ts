@@ -9,6 +9,8 @@ export interface CalendarEvent {
   end: string;   // ISO string
   recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
   timezone: string;
+  topic?: string;
+  checklist?: { id: string; text: string; done: boolean }[];
   notes?: string;
   createdAt: string;
 }

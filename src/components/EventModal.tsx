@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarEvent, SlotType } from '../types';
 import { SLOT_TYPES } from '../config';
-import { X, Trash2, Copy, Calendar, Clock, RotateCw, AlignLeft } from 'lucide-react';
+import { X, Trash2, Copy, Calendar, Clock, RotateCw, AlignLeft, CheckSquare, Plus, BookOpen, Check, ListChecks } from 'lucide-react';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -34,6 +34,11 @@ export default function EventModal({
   const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
   const [notes, setNotes] = useState('');
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  
+  // Custom tracking expansions
+  const [topic, setTopic] = useState('');
+  const [checklist, setChecklist] = useState<{ id: string; text: string; done: boolean }[]>([]);
+  const [newTaskText, setNewTaskText] = useState('');
 
   useEffect(() => {
     if (event) {
@@ -52,6 +57,8 @@ export default function EventModal({
       setRecurrence(event.recurrence);
       setNotes(event.notes || '');
       setTimezone(event.timezone || 'UTC');
+      setTopic(event.topic || '');
+      setChecklist(event.checklist || []);
     } else {
       setTitle('');
       setType('free');
@@ -69,10 +76,34 @@ export default function EventModal({
       setRecurrence('none');
       setNotes('');
       setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+      setTopic('');
+      setChecklist([]);
     }
+    setNewTaskText('');
   }, [event, defaultDate, defaultStartHour, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleAddTask = () => {
+    if (!newTaskText.trim()) return;
+    const newItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      text: newTaskText.trim(),
+      done: false,
+    };
+    setChecklist([...checklist, newItem]);
+    setNewTaskText('');
+  };
+
+  const handleRemoveTask = (taskId: string) => {
+    setChecklist(checklist.filter((t) => t.id !== taskId));
+  };
+
+  const handleToggleTaskState = (taskId: string) => {
+    setChecklist(
+      checklist.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t))
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,13 +121,19 @@ export default function EventModal({
       recurrence,
       timezone,
       notes: notes.trim(),
+      topic: topic.trim() || undefined,
+      checklist: checklist.length > 0 ? checklist : undefined,
     });
     onClose();
   };
 
   const handleDuplicateClick = () => {
     if (event && onDuplicate) {
-      onDuplicate(event);
+      onDuplicate({
+        ...event,
+        topic: topic.trim() || undefined,
+        checklist: checklist.length > 0 ? checklist : undefined,
+      });
       onClose();
     }
   };
@@ -105,44 +142,47 @@ export default function EventModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-stone-900/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal Box */}
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-6 text-slate-100 shadow-2xl backdrop-blur-md transition-all">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-          <h3 className="text-lg font-semibold tracking-tight text-white flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-indigo-400" />
-            {event ? 'Edit Time Slot' : 'Add Time Slot'}
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border-2 border-[#D9D1C0] bg-white p-6 text-stone-800 shadow-2xl transition-all">
+        {/* Ring Binder Decor on Left Edge */}
+        <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-stone-100 border-r border-stone-200" />
+        
+        <div className="flex items-center justify-between border-b-2 border-stone-100 pb-4 pl-2">
+          <h3 className="text-lg font-serif font-black text-stone-900 flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-stone-500" />
+            {event ? 'Modify Calendar Block' : 'Schedule Study Block'}
           </h3>
           <button 
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-50 hover:text-stone-800 transition cursor-pointer"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4.5 w-4.5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4 pl-2 max-h-[80vh] overflow-y-auto pr-1 custom-scrollbar">
           {/* Title */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">
-              Slot Title / Activity
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5 font-mono">
+              Event Title / Activity Name
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. Chemistry Prep, Reading, Available"
+              placeholder="e.g. Physics Homework, Pre-calculus, General Avail"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:border-stone-800 focus:outline-none transition"
             />
           </div>
 
           {/* Type Selector */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-2 font-mono">
               Availability State
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -151,10 +191,10 @@ export default function EventModal({
                   key={st.value}
                   type="button"
                   onClick={() => setType(st.value as SlotType)}
-                  className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition cursor-pointer ${
+                  className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-xs font-bold transition cursor-pointer ${
                     type === st.value
-                      ? 'bg-slate-800 text-white border-indigo-500 shadow-indigo-500/10 shadow-lg'
-                      : 'bg-slate-950/40 text-slate-400 border-slate-800/80 hover:bg-slate-800/40'
+                      ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
+                      : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100'
                   }`}
                 >
                   <span>{st.indicator}</span>
@@ -164,10 +204,24 @@ export default function EventModal({
             </div>
           </div>
 
+          {/* Optional Topic - Advanced tracking */}
+          <div>
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5 font-mono flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5" /> Topic of Focus (Optional)
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Electromagnetism, Chapter 3 proofs, Vocab List A"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs text-stone-900 placeholder-stone-400 focus:border-stone-800 focus:outline-none transition"
+            />
+          </div>
+
           {/* Date & Times */}
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-1">
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 font-mono">
                 Date
               </label>
               <input
@@ -175,11 +229,11 @@ export default function EventModal({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900 focus:border-stone-800 focus:outline-none transition"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 font-mono">
                 Start Time
               </label>
               <input
@@ -187,11 +241,11 @@ export default function EventModal({
                 required
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900 focus:border-stone-800 focus:outline-none transition"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 font-mono">
                 End Time
               </label>
               <input
@@ -199,21 +253,79 @@ export default function EventModal({
                 required
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900 focus:border-stone-800 focus:outline-none transition"
               />
             </div>
+          </div>
+
+          {/* Checklist Builder */}
+          <div className="border border-stone-200 rounded-xl p-3 bg-stone-50/50 space-y-2">
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 flex items-center gap-1 font-mono">
+              <ListChecks className="h-4 w-4" /> Goal Checklist / Tasks
+            </label>
+            
+            {/* Input row */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Add task goal (e.g. Read 5 pages, Solve problem 1)..."
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddTask();
+                  }
+                }}
+                className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800"
+              />
+              <button
+                type="button"
+                onClick={handleAddTask}
+                className="p-1.5 rounded-lg bg-stone-900 text-stone-50 hover:bg-stone-800 flex items-center justify-center cursor-pointer transition"
+              >
+                <Plus className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            {/* List */}
+            {checklist.length > 0 ? (
+              <div className="space-y-1.5 pt-1 max-h-32 overflow-y-auto custom-scrollbar">
+                {checklist.map((task) => (
+                  <div key={task.id} className="flex items-center justify-between gap-2 p-1.5 bg-white rounded border border-stone-100">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTaskState(task.id)}
+                      className="flex items-center gap-2 text-left text-xs text-stone-700 font-medium cursor-pointer"
+                    >
+                      <CheckSquare className={`h-4 w-4 shrink-0 ${task.done ? 'text-indigo-600' : 'text-stone-300'}`} />
+                      <span className={task.done ? 'line-through text-stone-400' : ''}>{task.text}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTask(task.id)}
+                      className="text-stone-400 hover:text-rose-700 transition cursor-pointer p-0.5"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-stone-400 italic">No checklist targets added to this study block yet.</p>
+            )}
           </div>
 
           {/* Recurrence & Timezone */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <RotateCw className="h-3 w-3" /> Repeat
+              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 flex items-center gap-1 font-mono">
+                <RotateCw className="h-3 w-3" /> Repeat Schedule
               </label>
               <select
                 value={recurrence}
                 onChange={(e: any) => setRecurrence(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none transition"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900 focus:outline-none transition"
               >
                 <option value="none">No repeat</option>
                 <option value="daily">Every day</option>
@@ -222,13 +334,13 @@ export default function EventModal({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1 flex items-center gap-1 font-mono">
                 <Clock className="h-3 w-3" /> Timezone
               </label>
               <select
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none transition overflow-hidden text-ellipsis"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900 focus:outline-none transition overflow-hidden text-ellipsis"
               >
                 <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>Local Time</option>
                 <option value="UTC">UTC</option>
@@ -241,20 +353,20 @@ export default function EventModal({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <AlignLeft className="h-3 w-3" /> Notes
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5 flex items-center gap-1 font-mono">
+              <AlignLeft className="h-3 w-3" /> Notes & Descriptions
             </label>
             <textarea
-              placeholder="Add optional notes or descriptions..."
+              placeholder="Add optional notes, textbook chapters, resource links..."
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none transition resize-none"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs text-stone-900 placeholder-stone-400 focus:outline-none transition resize-none"
             />
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-6">
+          <div className="flex items-center justify-between border-t border-stone-100 pt-4 mt-6">
             <div className="flex gap-2">
               {event && onDelete && (
                 <button
@@ -263,7 +375,7 @@ export default function EventModal({
                     onDelete(event.id);
                     onClose();
                   }}
-                  className="rounded-xl bg-rose-500/10 p-2.5 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition"
+                  className="rounded-xl bg-rose-50 text-rose-700 border border-rose-200 p-2.5 hover:bg-rose-100 hover:text-rose-800 transition cursor-pointer"
                   title="Delete Event"
                 >
                   <Trash2 className="h-4.5 w-4.5" />
@@ -273,7 +385,7 @@ export default function EventModal({
                 <button
                   type="button"
                   onClick={handleDuplicateClick}
-                  className="rounded-xl bg-slate-800 p-2.5 text-slate-300 hover:bg-slate-700 hover:text-white transition flex items-center gap-1 text-xs font-medium"
+                  className="rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 p-2.5 text-stone-700 transition flex items-center gap-1 text-xs font-bold cursor-pointer"
                   title="Duplicate Event"
                 >
                   <Copy className="h-4 w-4" />
@@ -286,15 +398,15 @@ export default function EventModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition"
+                className="rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 px-4 py-2.5 text-xs font-bold text-stone-600 transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-600 hover:to-purple-700 transition"
+                className="rounded-xl bg-stone-900 hover:bg-stone-800 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition cursor-pointer"
               >
-                Save Slot
+                Save Schedule
               </button>
             </div>
           </div>

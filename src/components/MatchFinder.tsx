@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { CalendarEvent, MatchSlot } from '../types';
 import { db, collection, addDoc } from '../lib/firebase';
-import { USERS, HardcodedUser } from '../config';
+import { HardcodedUser } from '../config';
 import { expandEvents, findMatches, getLocalDateString, formatDuration } from '../utils/calendarUtils';
-import { Sparkles, Calendar, Clock, ArrowRight, Zap, CheckCircle2, ChevronDown, Check } from 'lucide-react';
+import { Sparkles, Clock, Zap, Check } from 'lucide-react';
 
 interface MatchFinderProps {
   currentUser: HardcodedUser;
@@ -126,32 +126,29 @@ export default function MatchFinder({ currentUser, partner, events }: MatchFinde
   return (
     <div className="space-y-4">
       {/* Intro Match Card */}
-      <div className="p-5 rounded-xl border border-slate-800 bg-gradient-to-br from-indigo-950/20 to-purple-950/20 backdrop-blur-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
-        {/* Decorative glow */}
-        <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-purple-500/10 blur-2xl pointer-events-none" />
-
-        <div className="space-y-1">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-purple-400 animate-bounce" />
+      <div className="p-5 rounded-xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.4)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
+        <div className="space-y-1.5 z-10">
+          <h3 className="text-base font-serif font-black text-stone-900 flex items-center gap-2">
+            <Sparkles className="h-4.5 w-4.5 text-amber-600 animate-bounce" />
             Automatic Overlap Matcher
           </h3>
-          <p className="text-xs text-slate-400">
-            Study Sync scans schedules in real-time to find continuous windows where you both are free or studying.
+          <p className="text-xs text-stone-500 font-sans leading-relaxed">
+            Study Sync scans both agendas in real-time to find continuous windows where you both are free or studying.
           </p>
         </div>
 
         {/* Sort selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold text-slate-500 uppercase">Sort By:</span>
-          <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+        <div className="flex items-center gap-2 z-10">
+          <span className="text-[10px] font-bold text-stone-400 uppercase font-mono tracking-wider">Sort:</span>
+          <div className="flex bg-stone-100 border border-stone-200 rounded-lg p-0.5 shadow-inner">
             {(['earliest', 'duration', 'today', 'week'] as const).map((opt) => (
               <button
                 key={opt}
                 onClick={() => setSortBy(opt)}
-                className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded transition cursor-pointer ${
+                className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition cursor-pointer ${
                   sortBy === opt
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white text-stone-900 shadow-xs border border-stone-200/50'
+                    : 'text-stone-500 hover:text-stone-800'
                 }`}
               >
                 {opt}
@@ -164,11 +161,11 @@ export default function MatchFinder({ currentUser, partner, events }: MatchFinde
       {/* Matches Grid List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {matches.length === 0 ? (
-          <div className="md:col-span-2 py-16 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/5">
-            <Sparkles className="h-8 w-8 text-slate-600 mx-auto mb-3" />
-            <p className="text-sm text-slate-400 font-semibold">No Shared Study Windows Discovered</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              Add some 'Free' or 'Studying' availability slots to your calendars and watch Study Sync find overlaps instantly!
+          <div className="md:col-span-2 py-16 text-center border-2 border-dashed border-stone-200 rounded-2xl bg-stone-50/40">
+            <Sparkles className="h-8 w-8 text-stone-300 mx-auto mb-3" />
+            <p className="text-xs font-serif italic text-stone-500">No shared study windows discovered in current ledger diaries.</p>
+            <p className="text-[11px] text-stone-400 mt-1 max-w-sm mx-auto font-sans">
+              Add some 'Free Space' or 'Studying' availability blocks to your calendars and watch Study Sync find overlaps instantly!
             </p>
           </div>
         ) : (
@@ -176,9 +173,9 @@ export default function MatchFinder({ currentUser, partner, events }: MatchFinde
             const status = bookingStatus[match.id] || 'idle';
             const durationStr = formatDuration(match.start, match.end);
             
-            let badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-            if (match.type === 'studying') badgeStyle = 'bg-sky-500/10 text-sky-400 border-sky-500/20';
-            if (match.type === 'mixed') badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+            let badgeStyle = 'bg-emerald-50 text-emerald-950 border-emerald-300';
+            if (match.type === 'studying') badgeStyle = 'bg-sky-50 text-sky-950 border-sky-300';
+            if (match.type === 'mixed') badgeStyle = 'bg-amber-50 text-amber-950 border-amber-300';
 
             const startStr = match.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const endStr = match.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -186,51 +183,51 @@ export default function MatchFinder({ currentUser, partner, events }: MatchFinde
             return (
               <div
                 key={match.id}
-                className="p-4 rounded-xl border border-slate-800 bg-slate-950/40 hover:border-slate-700 hover:bg-slate-950/70 transition flex items-center justify-between gap-4"
+                className="p-4 rounded-xl border-2 border-stone-200 bg-white hover:border-stone-400 hover:shadow-xs transition flex items-center justify-between gap-4"
               >
                 <div className="space-y-1.5 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">
+                    <span className="text-[10px] text-stone-400 font-bold uppercase font-mono tracking-wider">
                       {getDayLabel(match.dateStr)}
                     </span>
-                    <span className={`text-[9px] font-bold uppercase border px-2 py-0.5 rounded-full ${badgeStyle}`}>
+                    <span className={`text-[9px] font-bold uppercase border-2 px-2 py-0.5 rounded-full ${badgeStyle}`}>
                       {match.label}
                     </span>
                   </div>
 
-                  <p className="text-sm font-bold text-white flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-indigo-400 shrink-0" />
+                  <p className="text-base font-black text-stone-900 flex items-center gap-1.5 font-mono">
+                    <Clock className="h-4 w-4 text-stone-400 shrink-0" />
                     <span>{startStr} - {endStr}</span>
                   </p>
 
-                  <p className="text-[10px] text-slate-400 font-medium">
-                    Continuous Duration: <span className="text-slate-200 font-bold">{durationStr}</span>
+                  <p className="text-[10px] text-stone-500">
+                    Continuous Duration: <strong className="text-stone-800 font-bold">{durationStr}</strong>
                   </p>
                 </div>
 
                 <button
                   disabled={status !== 'idle'}
                   onClick={() => handleBookSession(match)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 border-2 ${
                     status === 'booked'
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                       : status === 'booking'
-                      ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow shadow-indigo-500/10'
+                      ? 'bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                      : 'bg-stone-900 hover:bg-stone-800 text-white border-stone-900 shadow-xs'
                   }`}
                 >
                   {status === 'booked' ? (
-                    <>
-                      <Check className="h-4 w-4" />
+                    <span className="flex items-center gap-1">
+                      <Check className="h-4 w-4 text-emerald-700" />
                       <span>Booked!</span>
-                    </>
+                    </span>
                   ) : status === 'booking' ? (
                     <span>Syncing...</span>
                   ) : (
-                    <>
-                      <Zap className="h-4 w-4" />
+                    <span className="flex items-center gap-1">
+                      <Zap className="h-3.5 w-3.5 text-amber-300" />
                       <span>Lock Study</span>
-                    </>
+                    </span>
                   )}
                 </button>
               </div>

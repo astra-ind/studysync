@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { CalendarEvent, SlotType } from '../types';
-import { SLOT_TYPES } from '../config';
 import { getLocalDateString, getMonthDays, expandEvents } from '../utils/calendarUtils';
-import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin, Grid, Layers, Filter, Search } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Filter, Search, BookOpen, CheckSquare } from 'lucide-react';
 
 interface PersonalCalendarProps {
   userId: string;
@@ -27,9 +26,9 @@ export default function PersonalCalendar({
   const [typeFilter, setTypeFilter] = useState<string>('all');
   
   // Timezone Override
-  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-  // Track current time for line indicator
+  // Track current time for red line indicator
   const [nowTime, setNowTime] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -121,7 +120,8 @@ export default function PersonalCalendar({
         const query = searchQuery.toLowerCase();
         const matchesTitle = e.title.toLowerCase().includes(query);
         const matchesNotes = e.notes ? e.notes.toLowerCase().includes(query) : false;
-        if (!matchesTitle && !matchesNotes) return false;
+        const matchesTopic = e.topic ? e.topic.toLowerCase().includes(query) : false;
+        if (!matchesTitle && !matchesNotes && !matchesTopic) return false;
       }
       
       return true;
@@ -149,41 +149,41 @@ export default function PersonalCalendar({
   // Helper to format slot background in grids
   const getSlotStyle = (type: SlotType) => {
     switch (type) {
-      case 'free': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30';
-      case 'studying': return 'bg-sky-500/20 text-sky-400 border-sky-500/30 hover:bg-sky-500/30';
-      case 'busy': return 'bg-rose-500/20 text-rose-400 border-rose-500/30 hover:bg-rose-500/30';
-      case 'maybe': return 'bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30';
+      case 'free': return 'bg-emerald-50 text-emerald-950 border-2 border-emerald-300 hover:bg-emerald-100';
+      case 'studying': return 'bg-sky-50 text-sky-950 border-2 border-sky-300 hover:bg-sky-100';
+      case 'busy': return 'bg-stone-50 text-stone-900 border-2 border-stone-200 hover:bg-stone-100';
+      case 'maybe': return 'bg-amber-50 text-amber-950 border-2 border-amber-300 hover:bg-amber-100';
     }
   };
 
   return (
     <div className="space-y-4">
       {/* Search / Filter bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-xl border border-slate-800 bg-slate-900/30 backdrop-blur-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-xl border-2 border-[#D9D1C0] bg-white shadow-sm">
         {/* Search */}
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
           <input
             type="text"
-            placeholder="Search slots..."
+            placeholder="Search focus topic, notes, or titles..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-slate-800 bg-slate-950 pl-9 pr-4 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            className="w-full rounded-lg border border-stone-200 bg-stone-50 pl-9 pr-4 py-1.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800 transition"
           />
         </div>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Slot Type Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-            <Filter className="h-3 w-3 text-indigo-400" />
+          <div className="flex items-center gap-1.5 bg-stone-50 px-3 py-1.5 rounded-lg border border-stone-200">
+            <Filter className="h-3 w-3 text-stone-500" />
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="bg-transparent border-none text-[10px] font-semibold text-slate-300 focus:outline-none uppercase tracking-wider"
+              className="bg-transparent border-none text-[10px] font-bold text-stone-700 focus:outline-none uppercase tracking-wider font-mono cursor-pointer"
             >
               <option value="all">ALL TYPES</option>
-              <option value="free">🟢 FREE</option>
+              <option value="free">🟢 FREE SPACE</option>
               <option value="studying">🔵 STUDYING</option>
               <option value="busy">🔴 BUSY</option>
               <option value="maybe">🟡 MAYBE</option>
@@ -191,39 +191,41 @@ export default function PersonalCalendar({
           </div>
 
           {/* Timezone display */}
-          <div className="flex items-center gap-1 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-[10px] font-semibold text-slate-400">
-            <Clock className="h-3 w-3 text-purple-400" />
-            <span>TZ: {timezone.split('/').pop()?.replace('_', ' ')}</span>
+          <div className="flex items-center gap-1 bg-stone-50 px-3 py-1.5 rounded-lg border border-stone-200 text-[10px] font-bold text-stone-500 font-mono">
+            <Clock className="h-3.5 w-3.5 text-stone-400" />
+            <span>ZONE: {timezone.split('/').pop()?.replace('_', ' ')}</span>
           </div>
         </div>
       </div>
 
       {/* Main Calendar Frame */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/30 backdrop-blur-md overflow-hidden flex flex-col">
+      <div className="rounded-2xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.4)] overflow-hidden flex flex-col">
+        
         {/* Calendar Header Control */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b border-slate-800/80 bg-slate-950/20">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b-2 border-[#E3DEC3] bg-stone-50/50">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-white">
+            <h2 className="text-base font-serif font-black text-stone-900 flex items-center gap-2">
+              <CalendarIcon className="h-4.5 w-4.5 text-stone-500" />
               {view === 'month' && currentDate.toLocaleDateString([], { month: 'long', year: 'numeric' })}
               {view === 'week' && `Week of ${weekDates[0].toLocaleDateString([], { month: 'short', day: 'numeric' })}`}
               {view === 'day' && currentDate.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
             </h2>
-            <div className="flex items-center gap-1 rounded-lg bg-slate-950 border border-slate-800 p-0.5 ml-2">
+            <div className="flex items-center gap-0.5 rounded-lg bg-white border border-stone-200 p-0.5 ml-2 shadow-xs">
               <button
                 onClick={handlePrev}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-900 transition cursor-pointer"
+                className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-50 transition cursor-pointer"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={handleToday}
-                className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300 hover:text-white transition cursor-pointer"
+                className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-600 hover:text-stone-900 transition cursor-pointer font-mono"
               >
                 Today
               </button>
               <button
                 onClick={handleNext}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-900 transition cursor-pointer"
+                className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-50 transition cursor-pointer"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -231,15 +233,15 @@ export default function PersonalCalendar({
           </div>
 
           {/* View Toggles */}
-          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-stone-100 border border-stone-200 rounded-lg p-0.5 shadow-inner">
             {(['day', 'week', 'month'] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-md transition cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded-md transition cursor-pointer ${
                   view === v
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-stone-900 text-stone-50 shadow-sm'
+                    : 'text-stone-500 hover:text-stone-900'
                 }`}
               >
                 {v}
@@ -251,10 +253,10 @@ export default function PersonalCalendar({
         {/* Calendar Body views */}
         {view === 'month' ? (
           /* MONTH GRID VIEW */
-          <div className="grid grid-cols-7 border-b border-slate-800">
+          <div className="grid grid-cols-7 border-b border-stone-100 bg-[#FCFBF8]">
             {/* Weekday headers */}
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="py-2.5 text-center border-r border-slate-800 bg-slate-950/40 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <div key={d} className="py-2.5 text-center border-r border-b border-stone-200 bg-stone-50/50 text-[10px] font-bold text-stone-400 uppercase tracking-widest font-mono">
                 {d}
               </div>
             ))}
@@ -267,18 +269,18 @@ export default function PersonalCalendar({
                   <div
                     key={idx}
                     onClick={() => onAddSlotClick(dateStr)}
-                    className={`min-h-[100px] border-r border-b border-slate-800 p-1.5 flex flex-col gap-1 transition-colors cursor-pointer ${
-                      day.isCurrentMonth ? 'bg-slate-900/10 hover:bg-slate-900/30' : 'bg-slate-950/20 opacity-40'
-                    } ${day.isToday ? 'bg-indigo-500/5 border-indigo-500/40' : ''}`}
+                    className={`min-h-[110px] border-r border-b border-stone-200 p-1.5 flex flex-col gap-1 transition-colors cursor-pointer ${
+                      day.isCurrentMonth ? 'bg-white hover:bg-stone-50/40' : 'bg-stone-50/30 opacity-40'
+                    } ${day.isToday ? 'bg-[#FCFAF2] border-amber-300' : ''}`}
                   >
                     <div className="flex justify-between items-center mb-1">
-                      <span className={`text-[10px] font-bold ${day.isToday ? 'text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full' : 'text-slate-400'}`}>
+                      <span className={`text-[10px] font-bold ${day.isToday ? 'text-[#8C6D1F] bg-[#FAF3D1] px-1.5 py-0.5 rounded-full' : 'text-stone-400'}`}>
                         {day.date.getDate()}
                       </span>
                     </div>
 
                     {/* Day events */}
-                    <div className="space-y-1 overflow-y-auto max-h-[70px] custom-scrollbar">
+                    <div className="space-y-1 overflow-y-auto max-h-[75px] custom-scrollbar">
                       {day.events.slice(0, 3).map((e) => {
                         const sTime = new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                         return (
@@ -288,7 +290,7 @@ export default function PersonalCalendar({
                               clickEvent.stopPropagation();
                               onEditSlotClick(e);
                             }}
-                            className={`px-1.5 py-0.5 rounded border text-[9px] font-bold truncate transition ${getSlotStyle(e.type)}`}
+                            className={`px-1.5 py-0.5 rounded-md border text-[9px] font-bold truncate transition ${getSlotStyle(e.type)}`}
                             title={`${e.title} (${sTime})`}
                           >
                             {e.title}
@@ -296,7 +298,7 @@ export default function PersonalCalendar({
                         );
                       })}
                       {day.events.length > 3 && (
-                        <div className="text-[8px] text-indigo-400 font-bold text-center">
+                        <div className="text-[8px] text-[#A58D56] font-bold text-center font-mono">
                           + {day.events.length - 3} more
                         </div>
                       )}
@@ -308,12 +310,12 @@ export default function PersonalCalendar({
           </div>
         ) : (
           /* WEEK / DAY VIEW SCHEDULERS (Absolute positioning grids) */
-          <div className="flex h-[800px] overflow-y-auto relative custom-scrollbar bg-slate-900/5">
+          <div className="flex h-[800px] overflow-y-auto relative custom-scrollbar bg-[#FCFBF8]">
             {/* Time labels column */}
-            <div className="w-14 sm:w-16 flex-none border-r border-slate-800/60 bg-slate-950/40 sticky left-0 z-20">
+            <div className="w-14 sm:w-16 flex-none border-r border-stone-200 bg-stone-50/40 sticky left-0 z-20">
               {hoursArray.map((h) => (
                 <div key={h} className="h-[60px] relative">
-                  <span className="absolute -top-2.5 right-2 text-[9px] font-bold text-slate-500 uppercase">
+                  <span className="absolute -top-2.5 right-2 text-[9px] font-bold text-stone-400 uppercase font-mono">
                     {h === 0 ? '12 AM' : h === 12 ? '12 PM' : h > 12 ? `${h - 12} PM` : `${h} AM`}
                   </span>
                 </div>
@@ -327,7 +329,7 @@ export default function PersonalCalendar({
               {hoursArray.map((h) => (
                 <div
                   key={h}
-                  className="absolute left-0 right-0 border-b border-slate-800/40 pointer-events-none"
+                  className="absolute left-0 right-0 border-b border-stone-200/50 pointer-events-none"
                   style={{ top: `${h * 60}px`, height: '60px' }}
                 />
               ))}
@@ -345,16 +347,16 @@ export default function PersonalCalendar({
                 return (
                   <div
                     key={colIdx}
-                    className={`relative border-r border-slate-800/60 min-h-[1440px] transition-colors ${
-                      isTodayCol ? 'bg-indigo-500/[0.01]' : ''
+                    className={`relative border-r border-stone-200 min-h-[1440px] transition-colors ${
+                      isTodayCol ? 'bg-amber-500/[0.015]' : ''
                     }`}
                   >
                     {/* Column Header label (Sticky top) */}
-                    <div className="sticky top-0 bg-slate-950/90 border-b border-slate-800/80 p-2 text-center z-10 backdrop-blur-md">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                    <div className="sticky top-0 bg-white border-b-2 border-stone-200 p-2 text-center z-10 shadow-xs">
+                      <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-widest font-mono">
                         {colDate.toLocaleDateString([], { weekday: 'short' })}
                       </span>
-                      <span className={`text-xs font-black ${isTodayCol ? 'text-indigo-400' : 'text-slate-100'}`}>
+                      <span className={`text-sm font-black ${isTodayCol ? 'text-[#8C6D1F] underline decoration-wavy' : 'text-stone-800'}`}>
                         {colDate.getDate()}
                       </span>
                     </div>
@@ -364,8 +366,8 @@ export default function PersonalCalendar({
                       <div
                         key={h}
                         onClick={() => onAddSlotClick(colDateStr, `${String(h).padStart(2, '0')}:00`)}
-                        className="absolute left-0 right-0 h-[60px] hover:bg-indigo-500/[0.03] transition-colors cursor-pointer"
-                        style={{ top: `${h * 60 + 38}px` }} // shift for header block
+                        className="absolute left-0 right-0 h-[60px] hover:bg-stone-200/30 transition-colors cursor-pointer"
+                        style={{ top: `${h * 60 + 44}px` }} // shift for header block
                       />
                     ))}
 
@@ -377,26 +379,49 @@ export default function PersonalCalendar({
                       const startMin = startD.getHours() * 60 + startD.getMinutes();
                       const endMin = endD.getHours() * 60 + endD.getMinutes();
                       
-                      const topPx = startMin + 38; // offset for column header
-                      const heightPx = Math.max(30, endMin - startMin); // minimum 30px height
+                      const topPx = startMin + 44; // offset for column header
+                      const heightPx = Math.max(34, endMin - startMin); // minimum 34px height
+
+                      const totalTasks = e.checklist?.length || 0;
+                      const doneTasks = e.checklist?.filter((t) => t.done).length || 0;
 
                       return (
                         <div
                           key={e.id}
                           onClick={() => onEditSlotClick(e)}
                           style={{ top: `${topPx}px`, height: `${heightPx}px` }}
-                          className={`absolute left-1 right-1 rounded-xl p-2 border text-[10px] font-bold overflow-hidden shadow-md backdrop-blur-sm hover:scale-[1.01] transition-all cursor-pointer z-10 ${getSlotStyle(
+                          className={`absolute left-0.5 right-0.5 rounded-xl p-2 border-2 text-[10px] font-bold overflow-hidden shadow-sm hover:scale-[1.01] transition-all cursor-pointer z-10 flex flex-col justify-between ${getSlotStyle(
                             e.type
                           )}`}
                         >
-                          <p className="truncate text-white text-xs">{e.title}</p>
-                          <p className="opacity-80 text-[9px] mt-0.5">
-                            {startD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {endD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                          {e.notes && (
-                            <p className="text-[8px] font-normal opacity-70 italic line-clamp-1 mt-1">
-                              {e.notes}
+                          <div>
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="truncate text-stone-900 font-bold text-xs">{e.title}</p>
+                              {totalTasks > 0 && (
+                                <span className="text-[8px] font-mono font-bold bg-white/80 border border-stone-200 rounded px-1 shrink-0 flex items-center gap-0.5">
+                                  ✓ {doneTasks}/{totalTasks}
+                                </span>
+                              )}
+                            </div>
+                            <p className="opacity-80 text-[9px] font-medium font-mono mt-0.5">
+                              {startD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {endD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
+                          </div>
+                          
+                          {/* Show topic & notes if block has space */}
+                          {heightPx > 65 && (
+                            <div className="mt-1 space-y-0.5 border-t border-stone-200/40 pt-1">
+                              {e.topic && (
+                                <p className="text-[8px] font-bold uppercase truncate font-mono text-stone-600">
+                                  📚 {e.topic}
+                                </p>
+                              )}
+                              {e.notes && (
+                                <p className="text-[8px] font-normal opacity-70 italic truncate font-serif">
+                                  {e.notes}
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
                       );
@@ -406,10 +431,10 @@ export default function PersonalCalendar({
                     {isTodayCol && (
                       <div
                         className="absolute left-0 right-0 flex items-center pointer-events-none z-20"
-                        style={{ top: `${timeIndicatorTop + 38}px` }}
+                        style={{ top: `${timeIndicatorTop + 44}px` }}
                       >
-                        <div className="h-1.5 w-1.5 rounded-full bg-rose-500 -ml-1 shadow-rose-500 shadow-md" />
-                        <div className="h-[1.5px] flex-1 bg-rose-500/80 shadow-rose-500 shadow-sm" />
+                        <div className="h-1.5 w-1.5 rounded-full bg-rose-600 -ml-1 shadow-sm" />
+                        <div className="h-[1.5px] flex-1 bg-rose-500" />
                       </div>
                     )}
                   </div>
@@ -421,23 +446,23 @@ export default function PersonalCalendar({
       </div>
 
       {/* Legend Card */}
-      <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl border border-slate-800 bg-slate-900/20 text-xs">
-        <span className="font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Legend:</span>
+      <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl border-2 border-stone-200 bg-white text-xs">
+        <span className="font-bold text-stone-400 uppercase tracking-widest text-[9px] font-mono">Legend:</span>
         <div className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          <span className="text-slate-300">🟢 Free</span>
+          <span className="text-stone-700 font-bold">🟢 Free Space</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
-          <span className="text-slate-300">🔵 Studying</span>
+          <span className="text-stone-700 font-bold">🔵 Focused Studying</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-          <span className="text-slate-300">🔴 Busy</span>
+          <span className="h-2.5 w-2.5 rounded-full bg-stone-500" />
+          <span className="text-stone-700 font-bold">🔴 Busy / Unavailable</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-          <span className="text-slate-300">🟡 Maybe Available</span>
+          <span className="text-stone-700 font-bold">🟡 Maybe Available</span>
         </div>
       </div>
     </div>

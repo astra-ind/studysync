@@ -11,8 +11,17 @@ import EventModal from './components/EventModal';
 import { Sparkles, Calendar, BookOpen, Users, Zap, HelpCircle, Keyboard, RefreshCw, X } from 'lucide-react';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('study_sync_auth_v2') === 'true';
+  });
+  const [activeUserId, setActiveUserId] = useState<string>(() => {
+    return localStorage.getItem('study_sync_user_id') || USER_A.id;
+  });
+  const [selectedLoginUser, setSelectedLoginUser] = useState<string>(USER_A.id);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [pinError, setPinError] = useState('');
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'personal' | 'shared' | 'matches'>('dashboard');
-  const [activeUserId, setActiveUserId] = useState<string>(USER_A.id);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   
   // Real-time Sync Status
@@ -30,6 +39,31 @@ export default function App() {
   // Compute active & partner users
   const activeUser = activeUserId === USER_A.id ? USER_A : USER_B;
   const partnerUser = activeUserId === USER_A.id ? USER_B : USER_A;
+
+  // Handle Authentication submit
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (enteredPin === '2009') {
+      setIsAuthenticated(true);
+      setActiveUserId(selectedLoginUser);
+      localStorage.setItem('study_sync_auth_v2', 'true');
+      localStorage.setItem('study_sync_user_id', selectedLoginUser);
+      setPinError('');
+      setEnteredPin('');
+    } else {
+      setPinError('Incorrect Secret PIN. Please check with your study partner.');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('study_sync_auth_v2');
+  };
+
+  const handleUserSwitch = (userId: string) => {
+    setActiveUserId(userId);
+    localStorage.setItem('study_sync_user_id', userId);
+  };
 
   // Real-time sync listener
   useEffect(() => {
@@ -288,36 +322,127 @@ export default function App() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Dynamic Glowing Accents */}
-      <div className="absolute top-0 left-1/4 h-[300px] w-[500px] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none" />
-      <div className="absolute top-1/3 right-1/4 h-[400px] w-[600px] rounded-full bg-purple-500/5 blur-[150px] pointer-events-none" />
+  // Render the Welcome PIN Authentication screen if not logged in
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#F5F2EB] paper-pattern text-stone-800 flex items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-md bg-white border-2 border-[#D9D1C0] rounded-2xl p-8 shadow-[6px_6px_0px_0px_rgba(217,209,192,0.5)] flex flex-col relative overflow-hidden">
+          {/* Top binder style rings decor */}
+          <div className="absolute top-0 left-0 right-0 h-3 bg-gradient-to-r from-stone-200 via-stone-300 to-stone-200 border-b border-stone-300/40" />
+          
+          <div className="text-center space-y-2 mt-2">
+            <span className="text-[10px] uppercase font-bold tracking-widest text-[#B59F74] font-mono block">
+              📚 Locked Partner Portal
+            </span>
+            <h1 className="text-4xl font-serif font-black tracking-tight text-stone-900">
+              Study Sync
+            </h1>
+            <p className="text-xs text-stone-500 font-serif italic max-w-xs mx-auto">
+              A private, real-time study ledger and scheduler for exactly two partners. Entered pin is synced.
+            </p>
+          </div>
 
-      {/* Main Navigation Header */}
-      <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <form onSubmit={handleLoginSubmit} className="mt-8 space-y-6">
+            {/* Identity Select */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 font-mono">
+                Identify Yourself
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {USERS.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setSelectedLoginUser(u.id)}
+                    className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1.5 cursor-pointer ${
+                      selectedLoginUser === u.id
+                        ? 'border-stone-800 bg-stone-50 text-stone-900 shadow-sm'
+                        : 'border-stone-200 bg-[#FAF9F6] text-stone-500 hover:border-stone-300'
+                    }`}
+                  >
+                    <span className="text-3xl">{u.avatar}</span>
+                    <span className="text-xs font-bold uppercase tracking-wide">{u.name}</span>
+                    <span className="text-[9px] text-stone-400 font-medium font-mono">
+                      {u.id === 'user_a' ? 'User 1' : 'User 2'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* PIN Code entry */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-baseline">
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 font-mono">
+                  Secret PIN
+                </label>
+                <span className="text-[10px] text-stone-400 font-sans italic">hint: year in prompt (2009)</span>
+              </div>
+              <input
+                type="password"
+                maxLength={4}
+                required
+                placeholder="••••"
+                value={enteredPin}
+                onChange={(e) => {
+                  setEnteredPin(e.target.value);
+                  setPinError('');
+                }}
+                className="w-full text-center tracking-[0.5rem] text-xl font-mono bg-stone-50 border-2 border-[#D9D1C0] focus:border-stone-800 rounded-xl px-4 py-3 focus:outline-none transition"
+              />
+            </div>
+
+            {pinError && (
+              <p className="text-xs font-semibold font-mono text-rose-700 bg-rose-50 border border-rose-200 p-2.5 rounded-lg text-center">
+                ⚠️ {pinError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-stone-900 hover:bg-stone-800 active:bg-black text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-widest transition-all cursor-pointer shadow-md"
+            >
+              Unlock Partner Portal
+            </button>
+          </form>
+
+          {/* Connection status */}
+          <div className="mt-8 pt-4 border-t border-stone-100 flex items-center justify-center gap-2 text-[10px] font-mono text-stone-400 uppercase tracking-wider">
+            <span className={`h-2 w-2 rounded-full ${syncStatus === 'synced' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+            <span>Firebase DB Status: {syncStatus}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FBF9F6] paper-pattern text-stone-800 flex flex-col font-sans transition-all duration-300">
+      
+      {/* Main Navigation Header - Paper Stationery aesthetic */}
+      <header className="border-b-2 border-[#E3DEC3] bg-white/90 backdrop-blur-md sticky top-0 z-40 px-4 py-3.5 shadow-sm">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           
           {/* Logo Brand */}
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white">
-              <Sparkles className="h-5 w-5 animate-spin-slow" />
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-stone-900 flex items-center justify-center shadow-md text-white">
+              <Sparkles className="h-5 w-5 text-amber-200" />
             </div>
             <div>
-              <h1 className="text-sm font-black tracking-wider text-white flex items-center gap-1.5 uppercase">
+              <h1 className="text-xl font-serif font-black tracking-tight text-stone-900 flex items-center gap-1.5 leading-none">
                 Study Sync
               </h1>
-              <span className="text-[9px] font-bold text-slate-500 tracking-widest block uppercase -mt-0.5">
+              <span className="text-[10px] font-bold text-[#A58D56] tracking-widest block uppercase font-mono mt-1">
                 Two-Partner Sync Engine
               </span>
             </div>
           </div>
 
           {/* Central Tabs Navigation */}
-          <nav className="hidden md:flex items-center gap-1 bg-slate-900/60 p-0.5 rounded-xl border border-slate-800">
+          <nav className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200 shadow-inner">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: BookOpen },
-              { id: 'personal', label: 'Personal Calendar', icon: Calendar },
+              { id: 'personal', label: 'My Calendar', icon: Calendar },
               { id: 'shared', label: 'Shared Grid', icon: Users },
               { id: 'matches', label: 'Match Finder', icon: Zap },
             ].map((tab) => {
@@ -326,13 +451,13 @@ export default function App() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg transition cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
                     activeTab === tab.id
-                      ? 'bg-slate-800 text-white shadow'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-stone-900 text-white shadow-sm'
+                      : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
                   }`}
                 >
-                  <IconComp className="h-4.5 w-4.5" />
+                  <IconComp className="h-4 w-4" />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -342,29 +467,30 @@ export default function App() {
           {/* Right Header Panel */}
           <div className="flex items-center gap-3">
             {/* Real-time Sync state */}
-            <div className="hidden sm:flex items-center gap-1.5 bg-slate-900/40 px-2.5 py-1.5 rounded-lg border border-slate-800/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="hidden lg:flex items-center gap-1.5 bg-stone-50 px-2.5 py-1.5 rounded-lg border border-stone-200 text-[10px] font-bold uppercase tracking-wider text-stone-500 font-mono">
               <span className={`h-1.5 w-1.5 rounded-full ${
-                syncStatus === 'synced' ? 'bg-emerald-500' : syncStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
+                syncStatus === 'synced' ? 'bg-emerald-500 animate-pulse' : syncStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
               }`} />
               <span>{syncStatus}</span>
             </div>
 
-            {/* Quick Switch Actor */}
-            <div className="flex items-center gap-2 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-              <span className="text-[9px] font-black uppercase text-slate-500 px-2 tracking-wider">Act As:</span>
-              <div className="flex gap-1">
+            {/* Switch Active User */}
+            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200">
+              <span className="text-[9px] font-bold uppercase text-stone-400 px-1.5 font-mono">Actor:</span>
+              <div className="flex gap-0.5">
                 {USERS.map((u) => (
                   <button
                     key={u.id}
-                    onClick={() => setActiveUserId(u.id)}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                    onClick={() => handleUserSwitch(u.id)}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
                       activeUserId === u.id
-                        ? 'bg-slate-800 text-white shadow-md border border-slate-700/60'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-white text-stone-900 shadow-sm border border-stone-200'
+                        : 'text-stone-400 hover:text-stone-700'
                     }`}
+                    title={`Act as ${u.name}`}
                   >
                     <span>{u.avatar}</span>
-                    <span className="hidden xs:inline">{u.name}</span>
+                    <span className="hidden md:inline text-[11px]">{u.name}</span>
                   </button>
                 ))}
               </div>
@@ -373,62 +499,59 @@ export default function App() {
             {/* Help & Shortcuts toggles */}
             <button
               onClick={() => setShowShortcuts(true)}
-              className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/40 text-slate-400 hover:text-white transition"
+              className="p-2 rounded-xl border border-stone-200 bg-white text-stone-500 hover:text-stone-900 transition hover:bg-stone-50 cursor-pointer shadow-sm"
               title="Keyboard Shortcuts"
             >
               <Keyboard className="h-4 w-4" />
             </button>
 
-            {/* Real-time activity activity alerts */}
+            {/* Real-time activity alerts */}
             <NotificationsFeed currentUser={activeUser} partner={partnerUser} events={events} />
+
+            {/* Exit/Logout gateway */}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl border border-stone-200 bg-white text-stone-500 hover:text-rose-700 transition hover:bg-rose-50 cursor-pointer shadow-sm text-xs font-bold uppercase font-mono flex items-center gap-1"
+              title="Lock Session"
+            >
+              🔒 Lock
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile Sub-Navigation Bar */}
-      <div className="md:hidden border-b border-slate-900 bg-slate-950 p-2 overflow-x-auto">
-        <div className="flex gap-1.5">
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: BookOpen },
-            { id: 'personal', label: 'Personal', icon: Calendar },
-            { id: 'shared', label: 'Shared', icon: Users },
-            { id: 'matches', label: 'Matches', icon: Zap },
-          ].map((tab) => {
-            const IconComp = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                  activeTab === tab.id
-                    ? 'bg-slate-900 text-white border border-slate-800'
-                    : 'text-slate-400 hover:text-slate-300'
-                }`}
-              >
-                <IconComp className="h-4 w-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Main Body Content stage */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 relative z-10">
         
+        {/* Dynamic header summary bar - Premium Stationery Feel */}
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white border-2 border-[#D9D1C0] rounded-xl p-4 shadow-[3px_3px_0px_0px_rgba(217,209,192,0.3)]">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{activeUser.avatar}</span>
+            <div>
+              <p className="text-xs font-bold text-stone-400 uppercase tracking-widest font-mono">Currently viewing as</p>
+              <p className="text-lg font-serif font-black text-stone-900">
+                {activeUser.name} <span className="text-xs font-sans font-normal text-stone-500">(Partner 1)</span>
+              </p>
+            </div>
+          </div>
+          <div className="text-center sm:text-right mt-2 sm:mt-0 font-serif italic text-stone-500 text-xs">
+            Linked to <strong className="text-stone-800 not-italic font-bold font-sans">{partnerUser.name}</strong> • Realtime Sync Enabled
+          </div>
+        </div>
+
         {/* Empty State Banner Offer */}
         {events.length === 0 && (
-          <div className="p-4 rounded-xl border border-dashed border-indigo-500/40 bg-indigo-500/5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
+          <div className="p-5 rounded-xl border-2 border-dashed border-[#B59F74] bg-[#FDFCF7] flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-indigo-400" />
+              <Sparkles className="h-5 w-5 text-[#B59F74]" />
               <div>
-                <p className="text-xs font-bold text-white">Prstine Study Sync Slate detected! 🌱</p>
-                <p className="text-[10px] text-slate-400">Seed sample scheduling data to instantly preview overlapping slots and dashboard visuals.</p>
+                <p className="text-sm font-bold text-stone-900 font-serif">Empty Study Sync Ledger! 📔</p>
+                <p className="text-xs text-stone-500">Seed sample scheduling data to instantly preview overlapping slots, side-by-side grids, and analytics.</p>
               </div>
             </div>
             <button
               onClick={handleSeedData}
-              className="px-4.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-black tracking-wider uppercase text-white shadow-lg shadow-indigo-500/10 cursor-pointer"
+              className="px-5 py-2.5 rounded-lg bg-stone-950 hover:bg-stone-800 text-stone-100 text-xs font-black tracking-wider uppercase shadow-md cursor-pointer transition-all"
             >
               Seed Sample Schedules
             </button>
@@ -436,71 +559,73 @@ export default function App() {
         )}
 
         {/* View Switch Stage */}
-        {activeTab === 'dashboard' && (
-          <Dashboard
-            currentUser={activeUser}
-            partner={partnerUser}
-            events={events}
-            onAddSlotClick={() => handleOpenAddModal()}
-          />
-        )}
+        <div className="transition-all duration-300">
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              currentUser={activeUser}
+              partner={partnerUser}
+              events={events}
+              onAddSlotClick={() => handleOpenAddModal()}
+            />
+          )}
 
-        {activeTab === 'personal' && (
-          <PersonalCalendar
-            userId={activeUser.id}
-            userName={activeUser.name}
-            events={events}
-            onAddSlotClick={handleOpenAddModal}
-            onEditSlotClick={handleOpenEditModal}
-          />
-        )}
+          {activeTab === 'personal' && (
+            <PersonalCalendar
+              userId={activeUser.id}
+              userName={activeUser.name}
+              events={events}
+              onAddSlotClick={handleOpenAddModal}
+              onEditSlotClick={handleOpenEditModal}
+            />
+          )}
 
-        {activeTab === 'shared' && (
-          <SharedCalendar
-            userA={USER_A}
-            userB={USER_B}
-            events={events}
-          />
-        )}
+          {activeTab === 'shared' && (
+            <SharedCalendar
+              userA={USER_A}
+              userB={USER_B}
+              events={events}
+            />
+          )}
 
-        {activeTab === 'matches' && (
-          <MatchFinder
-            currentUser={activeUser}
-            partner={partnerUser}
-            events={events}
-          />
-        )}
+          {activeTab === 'matches' && (
+            <MatchFinder
+              currentUser={activeUser}
+              partner={partnerUser}
+              events={events}
+            />
+          )}
+        </div>
       </main>
 
       {/* Keyboard Shortcuts Drawer / Overlay */}
       {showShortcuts && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={() => setShowShortcuts(false)} />
-          <div className="relative w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-200 shadow-2xl z-10">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-              <h4 className="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider">
-                <Keyboard className="h-4 w-4 text-indigo-400" />
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-xs" onClick={() => setShowShortcuts(false)} />
+          <div className="relative w-full max-w-sm rounded-2xl border-2 border-stone-200 bg-white p-6 text-stone-800 shadow-2xl z-10">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3 mb-4">
+              <h4 className="text-sm font-bold text-stone-900 flex items-center gap-2 uppercase tracking-wider font-mono">
+                <Keyboard className="h-4 w-4 text-stone-600" />
                 Keyboard Shortcuts
               </h4>
-              <button onClick={() => setShowShortcuts(false)} className="text-slate-400 hover:text-white transition">
+              <button onClick={() => setShowShortcuts(false)} className="text-stone-400 hover:text-stone-900 transition">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-2.5 text-xs font-mono">
               {[
                 { keys: ['D'], label: 'Jump to Dashboard' },
-                { keys: ['P'], label: 'Jump to Personal Calendar' },
+                { keys: ['P'], label: 'Jump to My Calendar' },
                 { keys: ['S'], label: 'Jump to Shared Blended Grid' },
                 { keys: ['M'], label: 'Jump to Match Overlaps Finder' },
                 { keys: ['A'], label: 'Quick Open Create Slot Form' },
                 { keys: ['U'], label: 'Switch Active Persona (Alex / Blake)' },
                 { keys: ['K'], label: 'Toggle Shortcuts list overlay' },
               ].map((sc, idx) => (
-                <div key={idx} className="flex justify-between items-center py-0.5 border-b border-slate-900/40">
-                  <span className="text-slate-400 font-medium">{sc.label}</span>
+                <div key={idx} className="flex justify-between items-center py-1 border-b border-stone-50">
+                  <span className="text-stone-500 text-[11px]">{sc.label}</span>
                   <div className="flex gap-1">
                     {sc.keys.map((k) => (
-                      <kbd key={k} className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-black text-indigo-400">
+                      <kbd key={k} className="bg-stone-100 border border-stone-200 px-2 py-0.5 rounded text-[10px] font-bold text-stone-800">
                         {k}
                       </kbd>
                     ))}
@@ -526,8 +651,9 @@ export default function App() {
       />
 
       {/* Footer Design Credits and shortcuts prompt */}
-      <footer className="border-t border-slate-950 py-6 text-center text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-950/20">
-        <p>Study Sync Two-Person Scheduler • All rights reserved • Press <kbd className="bg-slate-900 border border-slate-800/80 text-indigo-400 px-1.5 py-0.5 rounded text-[9px] mx-1">K</kbd> for Keyboard shortcuts</p>
+      <footer className="border-t-2 border-[#E3DEC3] py-8 text-center text-[10px] font-bold text-stone-400 uppercase tracking-widest bg-[#FAF9F6] font-mono">
+        <p>Study Sync Two-Person Scheduler Ledger • All Data Synced to Firestore</p>
+        <p className="mt-1.5 text-stone-300">Press <kbd className="bg-white border border-stone-200 text-stone-500 px-1.5 py-0.5 rounded text-[9px] mx-1 shadow-sm">K</kbd> for Keyboard shortcuts</p>
       </footer>
     </div>
   );

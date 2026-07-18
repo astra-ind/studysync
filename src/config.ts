@@ -15,29 +15,29 @@ export const USER_A: HardcodedUser = {
   id: 'user_a',
   name: 'Alex',
   avatar: '🎒',
-  color: 'text-cyan-400',
-  accentColor: 'cyan',
-  gradientFrom: 'from-cyan-500',
-  gradientTo: 'to-blue-600',
+  color: 'text-indigo-700',
+  accentColor: 'indigo',
+  gradientFrom: 'from-indigo-600',
+  gradientTo: 'to-blue-700',
 };
 
 export const USER_B: HardcodedUser = {
   id: 'user_b',
   name: 'Blake',
   avatar: '🧠',
-  color: 'text-fuchsia-400',
-  accentColor: 'fuchsia',
-  gradientFrom: 'from-fuchsia-500',
-  gradientTo: 'to-purple-600',
+  color: 'text-rose-800',
+  accentColor: 'rose',
+  gradientFrom: 'from-rose-600',
+  gradientTo: 'to-amber-700',
 };
 
 export const USERS = [USER_A, USER_B];
 
 export const SLOT_TYPES = [
-  { value: 'free', label: 'Free', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30', indicator: '🟢' },
-  { value: 'studying', label: 'Studying', color: 'bg-sky-500/20 text-sky-400 border-sky-500/30 hover:bg-sky-500/30', indicator: '🔵' },
-  { value: 'busy', label: 'Busy', color: 'bg-rose-500/20 text-rose-400 border-rose-500/30 hover:bg-rose-500/30', indicator: '🔴' },
-  { value: 'maybe', label: 'Maybe Available', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30', indicator: '🟡' },
+  { value: 'free', label: 'Free Space', color: 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100', indicator: '🟢' },
+  { value: 'studying', label: 'Focused Studying', color: 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100', indicator: '🔵' },
+  { value: 'busy', label: 'Busy / Unavailable', color: 'bg-stone-100 text-stone-800 border-stone-300 hover:bg-stone-200', indicator: '🔴' },
+  { value: 'maybe', label: 'Maybe Available', color: 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100', indicator: '🟡' },
 ];
 
 export const DAILY_STUDY_GOAL_HOURS = 4; // Daily study goal hours

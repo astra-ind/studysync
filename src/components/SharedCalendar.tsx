@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { CalendarEvent, SlotType } from '../types';
-import { USERS, HardcodedUser } from '../config';
+import React, { useState, useMemo } from 'react';
+import { CalendarEvent } from '../types';
+import { HardcodedUser } from '../config';
 import { calculateSharedGrid, getLocalDateString, TimeInterval } from '../utils/calendarUtils';
-import { Users, ChevronLeft, ChevronRight, Info, ShieldAlert, Sparkles, AlertTriangle } from 'lucide-react';
+import { Users, ChevronLeft, ChevronRight, Sparkles, Clock, Calendar } from 'lucide-react';
 
 interface SharedCalendarProps {
   userA: HardcodedUser;
@@ -61,19 +61,19 @@ export default function SharedCalendar({ userA, userB, events }: SharedCalendarP
 
   const hoursArray = Array.from({ length: 24 }, (_, i) => i);
 
-  // Helper to resolve colors
+  // Helper to resolve styles for merged status
   const getMergedStyle = (status: string) => {
     switch (status) {
       case 'green':
-        return 'bg-emerald-500/30 border-emerald-500/50 text-emerald-300';
+        return 'bg-emerald-50 border-2 border-emerald-300 text-emerald-950 font-bold';
       case 'blue':
-        return 'bg-sky-500/30 border-sky-500/50 text-sky-300 animate-pulse';
+        return 'bg-sky-50 border-2 border-sky-300 text-sky-950 font-bold';
       case 'orange':
-        return 'bg-amber-500/30 border-amber-500/50 text-amber-300 font-bold';
+        return 'bg-amber-50 border-2 border-amber-300 text-amber-950 font-black';
       case 'red':
-        return 'bg-rose-500/30 border-rose-500/50 text-rose-300';
+        return 'bg-rose-50 border-2 border-rose-200 text-rose-950 font-bold';
       case 'grey':
-        return 'bg-slate-700/30 border-slate-700/50 text-slate-400';
+        return 'bg-stone-100 border-2 border-stone-300 text-stone-800';
       default:
         return 'bg-transparent border-transparent';
     }
@@ -89,9 +89,9 @@ export default function SharedCalendar({ userA, userB, events }: SharedCalendarP
 
     let desc = `${userA.name}: ${labelA} | ${userB.name}: ${labelB}`;
     
-    if (mergedStatus === 'green') return `🎉 BOTH FREE (${desc})`;
-    if (mergedStatus === 'blue') return `⚡ STUDY TOGETHER (${desc})`;
-    if (mergedStatus === 'orange') return `🤝 OPPORTUNITY: One Free, One Studying (${desc})`;
+    if (mergedStatus === 'green') return `🎉 BOTH CHILLING / FREE (${desc})`;
+    if (mergedStatus === 'blue') return `⚡ BOTH STUDYING NOW (${desc})`;
+    if (mergedStatus === 'orange') return `🤝 OPPORTUNITY: One Free, One Study (${desc})`;
     if (mergedStatus === 'red') return `🔴 BUSY: Someone is busy (${desc})`;
     if (mergedStatus === 'grey') return `⚠️ MISMATCH / CONFLICT (${desc})`;
     return desc;
@@ -100,83 +100,80 @@ export default function SharedCalendar({ userA, userB, events }: SharedCalendarP
   return (
     <div className="space-y-4">
       {/* Overview Intro Card */}
-      <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/30 backdrop-blur-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="p-4 rounded-xl border-2 border-[#D9D1C0] bg-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg text-white">
+          <div className="p-2.5 bg-stone-100 border border-stone-200 rounded-lg text-stone-800 shrink-0">
             <Users className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Merged Sync Schedule</h3>
-            <p className="text-xs text-slate-400">
-              Visualizing schedules for <span className="font-semibold text-slate-200">{userA.name}</span> &amp; <span className="font-semibold text-slate-200">{userB.name}</span> combined.
+            <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider font-mono">Ledger Synchronization</h3>
+            <p className="text-xs text-stone-500 font-serif leading-relaxed">
+              Comparison overlay for <strong className="text-stone-700 font-bold">{userA.name}</strong> &amp; <strong className="text-stone-700 font-bold">{userB.name}</strong>.
             </p>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold">
-          <div className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded text-emerald-400">
+        <div className="flex flex-wrap items-center gap-2 text-[9px] font-bold font-mono uppercase tracking-wider">
+          <div className="flex items-center gap-1 bg-emerald-50 border-2 border-emerald-300 px-2 py-1 rounded-md text-emerald-900">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
             <span>Both Free</span>
           </div>
-          <div className="flex items-center gap-1 bg-sky-500/10 border border-sky-500/20 px-2 py-1 rounded text-sky-400">
+          <div className="flex items-center gap-1 bg-sky-50 border-2 border-sky-300 px-2 py-1 rounded-md text-sky-900">
             <span className="h-2 w-2 rounded-full bg-sky-500" />
-            <span>Both Study</span>
+            <span>Both Studying</span>
           </div>
-          <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded text-amber-400">
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
+          <div className="flex items-center gap-1 bg-amber-50 border-2 border-amber-300 px-2 py-1 rounded-md text-amber-900">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
             <span>1 Free + 1 Study</span>
           </div>
-          <div className="flex items-center gap-1 bg-rose-500/10 border border-rose-500/20 px-2 py-1 rounded text-rose-400">
+          <div className="flex items-center gap-1 bg-rose-50 border-2 border-rose-200 px-2 py-1 rounded-md text-rose-900">
             <span className="h-2 w-2 rounded-full bg-rose-500" />
-            <span>Busy</span>
-          </div>
-          <div className="flex items-center gap-1 bg-slate-700/20 border border-slate-700/30 px-2 py-1 rounded text-slate-400">
-            <span className="h-2 w-2 rounded-full bg-slate-500" />
-            <span>Conflict</span>
+            <span>Busy State</span>
           </div>
         </div>
       </div>
 
       {/* Shared Calendar Core */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/30 backdrop-blur-md overflow-hidden flex flex-col">
+      <div className="rounded-2xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.4)] overflow-hidden flex flex-col">
         {/* Sync control header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-800/80 bg-slate-950/20">
+        <div className="flex items-center justify-between p-4 border-b-2 border-[#E3DEC3] bg-stone-50/50">
           <div className="flex items-center gap-2">
-            <h4 className="text-sm font-bold uppercase tracking-wider text-white">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-stone-900 flex items-center gap-2 font-mono">
+              <Calendar className="h-4.5 w-4.5 text-stone-500" />
               {view === 'week' ? `Shared Week of ${weekDates[0].toLocaleDateString([], { month: 'short', day: 'numeric' })}` : `Shared Date: ${currentDate.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}`}
             </h4>
-            <div className="flex items-center gap-1 rounded-lg bg-slate-950 border border-slate-800 p-0.5 ml-2">
+            <div className="flex items-center gap-0.5 rounded-lg bg-white border border-stone-200 p-0.5 ml-2 shadow-xs">
               <button
                 onClick={handlePrev}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-900 transition cursor-pointer"
+                className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-50 transition cursor-pointer"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={handleToday}
-                className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300 hover:text-white transition cursor-pointer"
+                className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-600 hover:text-stone-900 transition cursor-pointer font-mono"
               >
                 Today
               </button>
               <button
                 onClick={handleNext}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-900 transition cursor-pointer"
+                className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-50 transition cursor-pointer"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-stone-100 border border-stone-200 rounded-lg p-0.5 shadow-inner">
             {(['week', 'day'] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-md transition cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded-md transition cursor-pointer ${
                   view === v
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-stone-900 text-stone-50 shadow-sm'
+                    : 'text-stone-500 hover:text-stone-900'
                 }`}
               >
                 {v}
@@ -186,12 +183,12 @@ export default function SharedCalendar({ userA, userB, events }: SharedCalendarP
         </div>
 
         {/* 30-minute interval scheduler matrix */}
-        <div className="flex h-[720px] overflow-y-auto relative custom-scrollbar bg-slate-900/5">
+        <div className="flex h-[720px] overflow-y-auto relative custom-scrollbar bg-[#FCFBF8]">
           {/* Hour indicators */}
-          <div className="w-14 sm:w-16 flex-none border-r border-slate-800/60 bg-slate-950/40 sticky left-0 z-20">
+          <div className="w-14 sm:w-16 flex-none border-r border-stone-200 bg-stone-50/40 sticky left-0 z-20">
             {hoursArray.map((h) => (
               <div key={h} className="h-[60px] relative">
-                <span className="absolute -top-2.5 right-2 text-[9px] font-bold text-slate-500 uppercase">
+                <span className="absolute -top-2.5 right-2 text-[9px] font-bold text-stone-400 uppercase font-mono">
                   {h === 0 ? '12 AM' : h === 12 ? '12 PM' : h > 12 ? `${h - 12} PM` : `${h} AM`}
                 </span>
               </div>
@@ -204,7 +201,7 @@ export default function SharedCalendar({ userA, userB, events }: SharedCalendarP
             {hoursArray.map((h) => (
               <div
                 key={h}
-                className="absolute left-0 right-0 border-b border-slate-800/40 pointer-events-none"
+                className="absolute left-0 right-0 border-b border-stone-200/50 pointer-events-none"
                 style={{ top: `${h * 60}px`, height: '60px' }}
               />
             ))}
@@ -215,13 +212,13 @@ export default function SharedCalendar({ userA, userB, events }: SharedCalendarP
               const gridIntervals = mergedGridsByDate[colDateStr] || [];
 
               return (
-                <div key={colIdx} className="relative border-r border-slate-800/60 min-h-[1440px]">
+                <div key={colIdx} className="relative border-r border-stone-200 min-h-[1440px]">
                   {/* Column Header (Sticky top) */}
-                  <div className="sticky top-0 bg-slate-950/90 border-b border-slate-800/80 p-2 text-center z-10 backdrop-blur-md">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                  <div className="sticky top-0 bg-white border-b-2 border-stone-200 p-2 text-center z-10 shadow-xs">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-widest font-mono">
                       {colDate.toLocaleDateString([], { weekday: 'short' })}
                     </span>
-                    <span className="text-xs font-black text-slate-100">
+                    <span className="text-xs font-black text-stone-800">
                       {colDate.getDate()}
                     </span>
                   </div>
@@ -229,28 +226,28 @@ export default function SharedCalendar({ userA, userB, events }: SharedCalendarP
                   {/* Render 48 interval blocks stack */}
                   <div className="absolute inset-0 pt-10" style={{ height: '1440px' }}>
                     {gridIntervals.map((interval, intIdx) => {
-                      const topPx = intIdx * 30 + 10; // offset
+                      const topPx = intIdx * 30 + 12; // offset
                       if (interval.mergedStatus === 'none') return null;
 
                       return (
                         <div
                           key={intIdx}
-                          style={{ top: `${topPx}px`, height: '30px' }}
-                          className={`absolute left-0.5 right-0.5 rounded-md px-1.5 py-1 border text-[9px] font-black flex items-center justify-between overflow-hidden shadow transition-all duration-150 group cursor-default z-10 ${getMergedStyle(
+                          style={{ top: `${topPx}px`, height: '28px' }}
+                          className={`absolute left-0.5 right-0.5 rounded-lg px-2 py-1 text-[9px] font-bold flex items-center justify-between overflow-hidden shadow-xs transition-all duration-150 group cursor-default z-10 ${getMergedStyle(
                             interval.mergedStatus
                           )}`}
                           title={getMergedLabel(interval)}
                         >
                           <div className="flex items-center gap-1 truncate">
-                            <span className="uppercase text-[8px] font-black opacity-80">
-                              {interval.mergedStatus === 'green' && '🟢 both free'}
-                              {interval.mergedStatus === 'blue' && '🔵 study!'}
-                              {interval.mergedStatus === 'orange' && '🤝 overlap'}
-                              {interval.mergedStatus === 'red' && '🔴 busy'}
-                              {interval.mergedStatus === 'grey' && '⚠️ mismatch'}
+                            <span className="uppercase text-[8px] font-bold tracking-wider font-mono">
+                              {interval.mergedStatus === 'green' && '🟢 BOTH FREE'}
+                              {interval.mergedStatus === 'blue' && '🔵 STUDYING'}
+                              {interval.mergedStatus === 'orange' && '🤝 OVERLAP'}
+                              {interval.mergedStatus === 'red' && '🔴 BUSY'}
+                              {interval.mergedStatus === 'grey' && '⚠️ CONFLICT'}
                             </span>
                           </div>
-                          <span className="text-[8px] opacity-70 group-hover:opacity-100 transition shrink-0">
+                          <span className="text-[8px] font-mono opacity-80 group-hover:opacity-100 transition shrink-0">
                             {interval.timeStr}
                           </span>
                         </div>
