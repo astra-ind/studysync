@@ -140,6 +140,115 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
 
   const goalPercentage = Math.min(100, Math.round((todayStudyHours / DAILY_STUDY_GOAL_HOURS) * 100));
 
+  // Total scheduled hours today
+  const todayTotalScheduledHours = useMemo(() => {
+    let totalMs = 0;
+    todaySchedule.forEach((e) => {
+      const start = new Date(e.start);
+      const end = new Date(e.end);
+      totalMs += end.getTime() - start.getTime();
+    });
+    return Math.round((totalMs / (1000 * 60 * 60)) * 10) / 10;
+  }, [todaySchedule]);
+
+  // Today's free/available hours
+  const todayFreeHours = useMemo(() => {
+    let totalMs = 0;
+    todaySchedule.forEach((e) => {
+      if (e.type === 'free') {
+        const start = new Date(e.start);
+        const end = new Date(e.end);
+        totalMs += end.getTime() - start.getTime();
+      }
+    });
+    return Math.round((totalMs / (1000 * 60 * 60)) * 10) / 10;
+  }, [todaySchedule]);
+
+  // Today's busy hours
+  const todayBusyHours = useMemo(() => {
+    let totalMs = 0;
+    todaySchedule.forEach((e) => {
+      if (e.type === 'busy' || e.type === 'maybe') {
+        const start = new Date(e.start);
+        const end = new Date(e.end);
+        totalMs += end.getTime() - start.getTime();
+      }
+    });
+    return Math.round((totalMs / (1000 * 60 * 60)) * 10) / 10;
+  }, [todaySchedule]);
+
+  // Scan for upcoming deadlines (including exam dates, due dates, uncompleted checklists)
+  const upcomingDeadlines = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const userAllEvents = events.filter((e) => e.userId === currentUser.id);
+    const list: { id: string; title: string; dateStr: string; type: string; details: string; daysLeft: number }[] = [];
+
+    userAllEvents.forEach((e) => {
+      const eventStart = new Date(e.start);
+      if (eventStart.getTime() < now.getTime()) return;
+
+      const titleLower = (e.title || '').toLowerCase();
+      const notesLower = (e.notes || '').toLowerCase();
+      const topicLower = (e.topic || '').toLowerCase();
+
+      const isDeadline = 
+        titleLower.includes('deadline') || titleLower.includes('due') || 
+        titleLower.includes('exam') || titleLower.includes('test') || 
+        titleLower.includes('quiz') || titleLower.includes('submit') || 
+        titleLower.includes('submission') || titleLower.includes('project') ||
+        notesLower.includes('deadline') || notesLower.includes('due') ||
+        notesLower.includes('exam') || notesLower.includes('test') ||
+        topicLower.includes('exam') || topicLower.includes('test');
+
+      const hasUnfinishedTasks = e.checklist && e.checklist.some((t) => !t.done);
+
+      if (isDeadline || hasUnfinishedTasks) {
+        const diffTime = eventStart.getTime() - now.getTime();
+        const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        let details = '';
+        if (e.checklist && e.checklist.length > 0) {
+          const unfinishedCount = e.checklist.filter((t) => !t.done).length;
+          details = `${unfinishedCount} pending tasks`;
+        } else if (e.notes) {
+          details = e.notes;
+        }
+
+        list.push({
+          id: e.id,
+          title: e.title,
+          dateStr: eventStart.toLocaleDateString([], { month: 'short', day: 'numeric', weekday: 'short' }),
+          type: isDeadline ? 'Exam/Deadline' : 'Unfinished Tasks',
+          details: details,
+          daysLeft: daysLeft
+        });
+      }
+    });
+
+    goals.forEach((g) => {
+      if (g.userId === currentUser.id && g.deadline && !g.completed) {
+        const goalDeadline = new Date(g.deadline);
+        if (goalDeadline.getTime() >= now.getTime()) {
+          const diffTime = goalDeadline.getTime() - now.getTime();
+          const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          list.push({
+            id: g.id,
+            title: `Goal: ${g.title}`,
+            dateStr: goalDeadline.toLocaleDateString([], { month: 'short', day: 'numeric', weekday: 'short' }),
+            type: 'Goal Target',
+            details: `${g.targetHours - g.currentHours}h remaining`,
+            daysLeft: daysLeft
+          });
+        }
+      }
+    });
+
+    return list.sort((a, b) => a.daysLeft - b.daysLeft);
+  }, [events, goals, currentUser]);
+
   // Study Streak Days
   const studyStreak = useMemo(() => {
     const studyDays = new Set<string>();
@@ -344,6 +453,126 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
           </div>
         </div>
       )}
+
+      {/* Daily Summary & Upcoming Deadlines Component */}
+      <div className="p-6 rounded-2xl border-2 border-[#D9D1C0] bg-[#FCFBF7] shadow-[4px_4px_0px_0px_rgba(217,209,192,0.3)] grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-500">
+        {/* Left Hand: Today's Scheduled Hours */}
+        <div className="space-y-4 pr-0 md:pr-4 border-r-0 md:border-r-2 md:border-dashed md:border-[#E8E3D3]">
+          <div className="flex items-center gap-2">
+            <Notebook className="h-5 w-5 text-[#B59F74]" />
+            <h3 className="text-sm font-black text-stone-900 uppercase tracking-widest font-mono">
+              Today's Summary
+            </h3>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="bg-stone-900 text-white rounded-2xl p-4 text-center min-w-[100px] border-2 border-stone-800 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.15)]">
+              <span className="block text-3xl font-black font-mono leading-none">{todayTotalScheduledHours}h</span>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-stone-400 font-mono mt-1 block">Scheduled</span>
+            </div>
+            <div className="flex-1 space-y-1">
+              <p className="text-xs text-stone-600 font-serif leading-relaxed">
+                You have {todaySchedule.length} active event block{todaySchedule.length === 1 ? '' : 's'} scheduled for today.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <span className="text-[10px] bg-sky-50 text-sky-800 font-bold border border-sky-100 rounded-md px-2 py-0.5 font-mono">
+                  📖 {todayStudyHours}h Study
+                </span>
+                <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold border border-emerald-100 rounded-md px-2 py-0.5 font-mono">
+                  ⏰ {todayFreeHours}h Available
+                </span>
+                <span className="text-[10px] bg-stone-100 text-stone-700 font-bold border border-stone-200 rounded-md px-2 py-0.5 font-mono">
+                  💼 {todayBusyHours}h Personal
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Progress Bar for Today's Study Goal */}
+          <div className="space-y-1.5 bg-white p-3 rounded-xl border border-[#EBE7D9]">
+            <div className="flex justify-between items-center text-[10px] font-bold text-stone-500 uppercase tracking-wider font-mono">
+              <span>Today's Study Target Progress</span>
+              <span>{todayStudyHours}h / {DAILY_STUDY_GOAL_HOURS}h</span>
+            </div>
+            <div className="w-full bg-stone-100 rounded-full h-2.5 overflow-hidden border border-stone-200">
+              <div
+                className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                style={{ width: `${goalPercentage}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Hand: Upcoming Deadlines & Target Milestones */}
+        <div className="space-y-4 flex flex-col justify-between">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+                <h3 className="text-sm font-black text-stone-900 uppercase tracking-widest font-mono">
+                  Upcoming Deadlines
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200 rounded-full px-2.5 py-0.5 font-mono uppercase">
+                {upcomingDeadlines.length} Alert{upcomingDeadlines.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-[145px] overflow-y-auto pr-1 custom-scrollbar">
+              {upcomingDeadlines.length === 0 ? (
+                <div className="py-6 text-center bg-white rounded-xl border border-dashed border-stone-200 flex flex-col items-center justify-center">
+                  <Sparkles className="h-6 w-6 text-emerald-600 mb-1 animate-pulse" />
+                  <p className="text-xs text-emerald-800 font-serif italic">No upcoming exams or milestones in the diary!</p>
+                  <p className="text-[9px] text-stone-400 font-mono uppercase tracking-wider mt-0.5">Everything is perfectly synchronized</p>
+                </div>
+              ) : (
+                upcomingDeadlines.slice(0, 3).map((deadline) => {
+                  let badgeColor = 'bg-stone-50 text-stone-600 border-stone-200';
+                  if (deadline.daysLeft <= 1) {
+                    badgeColor = 'bg-rose-50 text-rose-800 border-rose-200 animate-pulse';
+                  } else if (deadline.daysLeft <= 3) {
+                    badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
+                  }
+
+                  return (
+                    <div 
+                      key={deadline.id}
+                      className="p-2.5 rounded-xl border border-[#EBE7D9] bg-white flex items-center justify-between gap-3 text-xs shadow-xs hover:border-stone-400 transition"
+                    >
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="font-bold text-stone-900 truncate flex items-center gap-1.5">
+                          <span className="text-[9px] font-mono bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">
+                            {deadline.type}
+                          </span>
+                          <span className="truncate">{deadline.title}</span>
+                        </p>
+                        {deadline.details && (
+                          <p className="text-[11px] text-stone-500 truncate font-serif italic">
+                            {deadline.details}
+                          </p>
+                        )}
+                      </div>
+                      <div className={`text-right shrink-0 font-mono font-bold border px-2 py-1 rounded-lg ${badgeColor}`}>
+                        <span className="text-[10px] block">
+                          {deadline.daysLeft === 0 ? 'Today' : deadline.daysLeft === 1 ? '1 day left' : `In ${deadline.daysLeft} days`}
+                        </span>
+                        <span className="text-[9px] opacity-75 font-normal block text-center">
+                          {deadline.dateStr}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <p className="text-[10px] text-stone-400 font-mono uppercase tracking-wider mt-2 pt-2 border-t border-stone-100 flex items-center gap-1">
+            <span>📅 Live Sync Time:</span>
+            <span className="font-bold text-stone-600">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </p>
+        </div>
+      </div>
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

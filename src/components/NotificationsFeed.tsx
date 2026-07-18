@@ -187,7 +187,7 @@ export default function NotificationsFeed({ currentUser, partner, events }: Noti
             <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
               {notifications.length === 0 ? (
                 <div className="py-10 text-center">
-                  <p className="text-xs font-serif italic text-stone-400">Ledger diary is quiet. Nudge your study partner!</p>
+                  <p className="text-xs font-serif italic text-stone-400">Ledger diary is quiet. Send a nudge!</p>
                 </div>
               ) : (
                 notifications.map((notif) => (

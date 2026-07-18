@@ -63,7 +63,7 @@ export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCo
       setAiResult({
         schedule: [
           {
-            title: `Joint Study Session: ${currentUser.name} + ${partner.name}`,
+            title: `Personal Study Block: ${currentUser.name}`,
             type: 'studying',
             start: new Date().toISOString(),
             end: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
@@ -98,7 +98,7 @@ export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCo
         });
       }
 
-      // Add standard notifications so partner sees the study lock
+      // Add standard notifications so other user sees the study lock
       await addDoc(collection(db, 'notifications'), {
         text: `🤖 AI Study Sync: ${currentUser.name} asked the AI Planner Coach to customize their schedule based on goal: "${goalInput.substring(0, 45)}...". Programmed ${aiResult.schedule.length} slots!`,
         timestamp: new Date().toISOString(),
@@ -156,7 +156,7 @@ export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCo
       {/* Reassuring Loader Messages */}
       {isLoading && (
         <div className="p-4 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/20 text-center space-y-1.5 animate-pulse">
-          <p className="text-xs font-serif italic text-stone-700">"Consulting textbook syllabus and cross-checking partner diaries..."</p>
+          <p className="text-xs font-serif italic text-stone-700">"Consulting textbook syllabus and cross-checking sync diaries..."</p>
           <p className="text-[10px] text-stone-400 font-sans">Gemini is curating blocks that optimize collaboration without causing burnout.</p>
         </div>
       )}
