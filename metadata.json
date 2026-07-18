@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Study Sync",
+  "description": "Personal Study Partner Scheduler for exactly two users with real-time Firestore synchronization.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
