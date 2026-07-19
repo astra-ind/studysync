@@ -17,7 +17,9 @@ import {
   Square, 
   Notebook,
   AlertCircle,
-  Pin
+  Pin,
+  Activity,
+  Award
 } from 'lucide-react';
 
 import PomodoroTimer from './PomodoroTimer';
@@ -248,6 +250,29 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
 
     return list.sort((a, b) => a.daysLeft - b.daysLeft);
   }, [events, goals, currentUser]);
+
+  // User's active goals
+  const myGoals = useMemo(() => {
+    return goals.filter((g) => g.userId === currentUser.id);
+  }, [goals, currentUser]);
+
+  const totalGoalTargetHours = useMemo(() => {
+    return myGoals.reduce((sum, g) => sum + g.targetHours, 0);
+  }, [myGoals]);
+
+  const totalGoalCurrentHours = useMemo(() => {
+    return myGoals.reduce((sum, g) => sum + g.currentHours, 0);
+  }, [myGoals]);
+
+  const overallGoalProgressPercent = useMemo(() => {
+    if (totalGoalTargetHours <= 0) return 0;
+    return Math.min(100, Math.round((totalGoalCurrentHours / totalGoalTargetHours) * 100));
+  }, [totalGoalCurrentHours, totalGoalTargetHours]);
+
+  const studyEventVsGoalPercent = useMemo(() => {
+    if (totalGoalTargetHours <= 0) return 0;
+    return Math.min(100, Math.round((weeklyStudyHours / totalGoalTargetHours) * 100));
+  }, [weeklyStudyHours, totalGoalTargetHours]);
 
   // Study Streak Days
   const studyStreak = useMemo(() => {
@@ -571,6 +596,116 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
             <span>📅 Live Sync Time:</span>
             <span className="font-bold text-stone-600">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </p>
+        </div>
+      </div>
+
+      {/* Study Progress & Goal Analytics Tracker */}
+      <div id="study-progress-tracker" className="p-6 rounded-2xl border-2 border-[#D9D1C0] bg-white shadow-[4px_4px_0px_0px_rgba(217,209,192,0.3)] grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
+        {/* Column 1: Custom Radial Ring (Goal Completion Rate) */}
+        <div className="flex flex-col items-center justify-center text-center p-4 bg-[#FCFBF7] rounded-xl border border-[#EBE7D9] shadow-xs">
+          <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest block font-mono mb-4">Goal Completion Rate</span>
+          
+          <div className="relative h-28 w-28 flex items-center justify-center">
+            {/* SVG Radial Progress Ring */}
+            <svg className="w-full h-full transform -rotate-90">
+              {/* Outer track */}
+              <circle
+                cx="56"
+                cy="56"
+                r="46"
+                className="stroke-stone-100 fill-none"
+                strokeWidth="8"
+              />
+              {/* Inner progress */}
+              <circle
+                cx="56"
+                cy="56"
+                r="46"
+                className="stroke-indigo-600 fill-none transition-all duration-1000 ease-out"
+                strokeWidth="8"
+                strokeDasharray={2 * Math.PI * 46}
+                strokeDashoffset={2 * Math.PI * 46 - (overallGoalProgressPercent / 100) * 2 * Math.PI * 46}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute flex flex-col items-center justify-center">
+              <span className="text-2xl font-black text-stone-900 font-mono leading-none">{overallGoalProgressPercent}%</span>
+              <span className="text-[9px] uppercase font-bold text-stone-400 font-mono mt-0.5">Done</span>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-0.5">
+            <span className="text-xs font-black text-stone-800 font-serif">Logged vs. Targets</span>
+            <p className="text-[10px] text-stone-500 font-mono font-bold">
+              {Math.round(totalGoalCurrentHours * 10) / 10}h of {totalGoalTargetHours}h completed
+            </p>
+          </div>
+        </div>
+
+        {/* Column 2 & 3: Progress Analytics & Detailed Comparison */}
+        <div className="md:col-span-2 flex flex-col justify-between space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-[#B59F74]" />
+                <h3 className="text-sm font-black text-stone-900 uppercase tracking-widest font-mono">
+                  Study Progress & Event Alignment
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-100 rounded-full px-2.5 py-0.5 font-mono uppercase">
+                {myGoals.length} Active Target{myGoals.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
+            <p className="text-xs text-stone-600 font-serif leading-relaxed">
+              This analytics console maps your real-world calendar study blocks against your synchronized goals. 
+              We calculate how your scheduled study event hours compare with your target goal hours to maintain study consistency.
+            </p>
+
+            <div className="space-y-4 pt-1">
+              {/* Progress metric: Weekly Event Coverage vs. Goal Targets */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[10px] font-bold text-stone-500 uppercase tracking-wider font-mono">
+                  <span className="flex items-center gap-1">📅 Calendar Study Effort Coverage</span>
+                  <span className="font-bold text-stone-800">{weeklyStudyHours}h / {totalGoalTargetHours}h ({studyEventVsGoalPercent}%)</span>
+                </div>
+                <div className="w-full bg-stone-100 rounded-full h-3 overflow-hidden border border-stone-200">
+                  <div
+                    className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${studyEventVsGoalPercent}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-stone-400 font-mono leading-none block">
+                  Proportion of your combined goals target hours covered by actual scheduled calendar study events this week.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actionable insight bar */}
+          <div className="p-3 bg-[#FCFBF7] rounded-xl border border-[#EBE7D9] flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <Award className="h-5 w-5 text-[#B59F74] shrink-0" />
+              <div className="min-w-0">
+                <p className="font-bold text-stone-900 truncate">
+                  {myGoals.length === 0 
+                    ? '🌱 Set your first goal to begin tracking' 
+                    : overallGoalProgressPercent >= 100 
+                    ? '🏆 Goal Champion! All targets successfully nailed!' 
+                    : overallGoalProgressPercent >= 50 
+                    ? '🔥 Fantastic! More than halfway to total target completion!' 
+                    : weeklyStudyHours > 0 
+                    ? '⚡ Keep pushing! Steady progress being registered.' 
+                    : '📅 Begin tracking study slots to sync progress.'}
+                </p>
+                <p className="text-[10px] text-stone-500 truncate font-mono">
+                  {myGoals.length === 0 
+                    ? 'Use the goal establishing form below to log target milestones.' 
+                    : `Remaining target effort: ${Math.max(0, Math.round((totalGoalTargetHours - totalGoalCurrentHours) * 10) / 10)}h. Keep scheduling slots together!`}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
