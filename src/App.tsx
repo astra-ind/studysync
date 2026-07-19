@@ -49,7 +49,7 @@ export default function App() {
       return;
     }
     if (enteredPin === '2009') {
-      const selectedId = usernameNorm === 'GN' ? USER_A.id : USER_B.id;
+      const selectedId = usernameNorm === 'AVSC' ? USER_A.id : USER_B.id;
       setIsAuthenticated(true);
       setActiveUserId(selectedId);
       localStorage.setItem('study_sync_auth_v2', 'true');
