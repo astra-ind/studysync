@@ -3,6 +3,7 @@ import { CustomStudyGoal } from '../types';
 import { db, collection, addDoc, updateDoc, doc, deleteDoc } from '../lib/firebase';
 import { HardcodedUser } from '../config';
 import { Plus, Target, Check, Calendar, Trash2, Award, Zap } from 'lucide-react';
+import { useToast } from './Toast';
 
 interface GoalsTrackerProps {
   currentUser: HardcodedUser;
@@ -11,6 +12,7 @@ interface GoalsTrackerProps {
 }
 
 export default function GoalsTracker({ currentUser, partner, goals }: GoalsTrackerProps) {
+  const { toast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newHours, setNewHours] = useState('5');
@@ -50,8 +52,10 @@ export default function GoalsTracker({ currentUser, partner, goals }: GoalsTrack
       setNewCategory('General');
       setNewDeadline('');
       setIsAdding(false);
+      toast(`Goal "${newTitle.trim()}" established successfully!`, 'success');
     } catch (err) {
       console.error('Error saving goal:', err);
+      toast('Failed to save goal. Try again.', 'error');
     }
   };
 
@@ -74,9 +78,13 @@ export default function GoalsTracker({ currentUser, partner, goals }: GoalsTrack
           unread: true,
           type: 'success',
         });
+        toast(`🏆 Outstanding! Goal "${goal.title}" completed!`, 'success');
+      } else {
+        toast(`Goal "${goal.title}" marked as active.`, 'info');
       }
     } catch (err) {
       console.error(err);
+      toast('Failed to update goal status.', 'error');
     }
   };
 
@@ -85,8 +93,10 @@ export default function GoalsTracker({ currentUser, partner, goals }: GoalsTrack
     try {
       const ref = doc(db, 'goals', goalId);
       await deleteDoc(ref);
+      toast('Goal deleted successfully.', 'alert');
     } catch (err) {
       console.error(err);
+      toast('Failed to delete goal.', 'error');
     }
   };
 

@@ -3,6 +3,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { HardcodedUser } from '../config';
 import { db, collection, addDoc, doc, setDoc, onSnapshot } from '../lib/firebase';
 import { Sparkles, Calendar, Send, CheckCircle2, RotateCw, Check, Loader2, Info, Sliders, Lock } from 'lucide-react';
+import { useToast } from './Toast';
 
 interface AISchedulerCoachProps {
   currentUser: HardcodedUser;
@@ -27,6 +28,7 @@ interface AIResponse {
 }
 
 export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCoachProps) {
+  const { toast } = useToast();
   const [goalInput, setGoalInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AIResponse | null>(null);
@@ -78,9 +80,11 @@ export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCo
       }
 
       setShowSettingsSaved(true);
+      toast('AI Coach preferences saved successfully!', 'success');
       setTimeout(() => setShowSettingsSaved(false), 3000);
     } catch (err) {
       console.error('Error saving AI coach customization:', err);
+      toast('Failed to save preferences.', 'error');
     } finally {
       setIsSavingSettings(false);
     }
@@ -334,6 +338,7 @@ When designing the schedule:
 
     if (successData) {
       setAiResult(successData);
+      toast('AI Coach has drafted your plan successfully!', 'success');
     } else {
       // Setup timezone-safe fallback mock data to prevent crashes
       setAiResult({
@@ -349,6 +354,7 @@ When designing the schedule:
         ],
         advice: `⚠️ AI Coach Warning: The scheduling engine failed to connect to Gemini. Please configure your custom Gemini API Key in settings or check your connection.`,
       });
+      toast('Direct client-side fallback loaded.', 'info');
     }
 
     setIsLoading(false);
@@ -385,8 +391,10 @@ When designing the schedule:
 
       setIsProgrammed(true);
       setGoalInput('');
+      toast(`Scheduled ${aiResult.schedule.length} AI study slots into your Ledger!`, 'success');
     } catch (err) {
       console.error('Error programming events:', err);
+      toast('Failed to program AI slots into calendar.', 'error');
     }
   };
 

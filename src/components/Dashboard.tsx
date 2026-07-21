@@ -4,6 +4,7 @@ import { USERS, HardcodedUser, DAILY_STUDY_GOAL_HOURS } from '../config';
 import { db, doc, updateDoc, collection, query, onSnapshot, addDoc } from '../lib/firebase';
 import { expandEvents, findMatches, getLocalDateString } from '../utils/calendarUtils';
 import { downloadICS } from '../utils/icsUtils';
+import { useToast } from './Toast';
 import { 
   BookOpen, 
   Calendar as CalendarIcon, 
@@ -34,6 +35,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ currentUser, partner, events, onAddSlotClick }: DashboardProps) {
+  const { toast } = useToast();
   const [activeTaskFilter, setActiveTaskFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [goals, setGoals] = useState<CustomStudyGoal[]>([]);
 
@@ -393,15 +395,20 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
           unread: true,
           type: 'success',
         });
+        toast(`🏆 Goal completed: "${g.title}"!`, 'success');
+      } else {
+        toast(`Added ${hours}h progress to "${g.title}"!`, 'success');
       }
     } catch (err) {
       console.error('Error incrementing goal:', err);
+      toast('Failed to update goal progress.', 'error');
     }
   };
 
   // Handle Export ICS
   const handleExportICS = () => {
     downloadICS(userEvents, currentUser.name);
+    toast('Calendar exported successfully as StudySync.ics!', 'success');
   };
 
   // Toggle checklist item
@@ -416,8 +423,10 @@ export default function Dashboard({ currentUser, partner, events, onAddSlotClick
       ) || [];
 
       await updateDoc(eventRef, { checklist: updatedChecklist });
+      toast(currentDone ? 'Task marked as pending' : 'Task completed! Great job.', 'success');
     } catch (err) {
       console.error('Error toggling checklist item:', err);
+      toast('Failed to update task status.', 'error');
     }
   };
 

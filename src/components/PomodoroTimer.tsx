@@ -3,6 +3,7 @@ import { HardcodedUser } from '../config';
 import { db, collection, addDoc } from '../lib/firebase';
 import { Play, Pause, RotateCcw, Flame, Check, Coffee } from 'lucide-react';
 import { CustomStudyGoal } from '../types';
+import { useToast } from './Toast';
 
 interface PomodoroTimerProps {
   currentUser: HardcodedUser;
@@ -12,6 +13,7 @@ interface PomodoroTimerProps {
 }
 
 export default function PomodoroTimer({ currentUser, partner, goals, onIncrementGoal }: PomodoroTimerProps) {
+  const { toast } = useToast();
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [timeLeft, setTimeLeft] = useState(mode === 'focus' ? 25 * 60 : 5 * 60);
   const [isRunning, setIsRunning] = useState(false);
@@ -26,6 +28,7 @@ export default function PomodoroTimer({ currentUser, partner, goals, onIncrement
     setMode(newMode);
     setTimeLeft(newMode === 'focus' ? 25 * 60 : 5 * 60);
     setSessionCompleted(false);
+    toast(`Switched to ${newMode === 'focus' ? 'Focus Mode (25m)' : 'Break Mode (5m)'}.`, 'info');
   };
 
   // Timer Effect
@@ -112,6 +115,7 @@ export default function PomodoroTimer({ currentUser, partner, goals, onIncrement
       } catch (err) {
         console.error('Error logging Pomodoro session:', err);
       }
+      toast('🎉 Outstanding! You completed a 25-minute focus session!', 'success');
     } else {
       await addDoc(collection(db, 'notifications'), {
         text: `☕ Break finished! ${currentUser.name} is ready to dive back into focus blocks.`,
@@ -119,6 +123,7 @@ export default function PomodoroTimer({ currentUser, partner, goals, onIncrement
         unread: true,
         type: 'info',
       });
+      toast('☕ Break completed! Ready to dive back in?', 'success');
     }
   };
 
@@ -126,6 +131,7 @@ export default function PomodoroTimer({ currentUser, partner, goals, onIncrement
     setIsRunning(false);
     setTimeLeft(mode === 'focus' ? 25 * 60 : 5 * 60);
     setSessionCompleted(false);
+    toast('Timer reset successfully.', 'info');
   };
 
   const formatTime = (seconds: number) => {
@@ -238,7 +244,15 @@ export default function PomodoroTimer({ currentUser, partner, goals, onIncrement
       {/* Timer Controls */}
       <div className="flex items-center gap-2 w-full">
         <button
-          onClick={() => setIsRunning(!isRunning)}
+          onClick={() => {
+            const nextIsRunning = !isRunning;
+            setIsRunning(nextIsRunning);
+            if (nextIsRunning) {
+              toast(mode === 'focus' ? 'Focus timer started! Keep working!' : 'Break timer started! Rest well.', 'success');
+            } else {
+              toast('Timer paused.', 'info');
+            }
+          }}
           className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-2 ${
             isRunning
               ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100'

@@ -9,8 +9,10 @@ import MatchFinder from './components/MatchFinder';
 import NotificationsFeed from './components/NotificationsFeed';
 import EventModal from './components/EventModal';
 import { Sparkles, Calendar, BookOpen, Users, Zap, HelpCircle, Keyboard, RefreshCw, X } from 'lucide-react';
+import { useToast } from './components/Toast';
 
 export default function App() {
+  const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('study_sync_auth_v2') === 'true';
   });
@@ -46,6 +48,7 @@ export default function App() {
     const usernameNorm = enteredUsername.trim().toUpperCase();
     if (usernameNorm !== 'GN' && usernameNorm !== 'AVSC') {
       setPinError('Invalid Username. Access is restricted to GN and AVSC.');
+      toast(`Invalid Username: "${usernameNorm}"`, 'error');
       return;
     }
     if (enteredPin === '2009') {
@@ -57,19 +60,23 @@ export default function App() {
       setPinError('');
       setEnteredPin('');
       setEnteredUsername('');
+      toast(`Unlocked Study Sync successfully! Welcome, ${usernameNorm}.`, 'success');
     } else {
       setPinError('Incorrect Secret PIN. Please check with the other sync user.');
+      toast('Failed to unlock: Incorrect PIN', 'error');
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('study_sync_auth_v2');
+    toast('Portal locked. All local sessions closed.', 'info');
   };
 
   const handleUserSwitch = (userId: string) => {
     setActiveUserId(userId);
     localStorage.setItem('study_sync_user_id', userId);
+    toast(`Switched profile to ${userId === USER_A.id ? USER_A.name : USER_B.name}!`, 'success');
   };
 
   // Real-time sync listener
@@ -153,6 +160,7 @@ export default function App() {
           unread: true,
           type: 'info',
         });
+        toast(`Slot "${eventData.title}" updated successfully!`, 'success');
       } else {
         await addDoc(collection(db, 'events'), {
           ...eventData,
@@ -165,6 +173,7 @@ export default function App() {
           unread: true,
           type: 'success',
         });
+        toast(`Slot "${eventData.title}" added successfully!`, 'success');
       }
 
       // Check for @A and @G mentions
@@ -187,6 +196,7 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
+      toast('Failed to save slot. Try again.', 'error');
     }
   };
 
@@ -202,8 +212,10 @@ export default function App() {
         unread: true,
         type: 'alert',
       });
+      toast('Slot deleted successfully.', 'alert');
     } catch (err) {
       console.error(err);
+      toast('Failed to delete slot.', 'error');
     }
   };
 
@@ -235,8 +247,10 @@ export default function App() {
         unread: true,
         type: 'info',
       });
+      toast(`Slot duplicated to tomorrow successfully!`, 'success');
     } catch (err) {
       console.error(err);
+      toast('Failed to duplicate slot.', 'error');
     }
   };
 
