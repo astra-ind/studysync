@@ -20,6 +20,9 @@ interface AIEvent {
 interface AIResponse {
   schedule: AIEvent[];
   advice: string;
+  metadata?: {
+    modelUsed?: string;
+  };
 }
 
 export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCoachProps) {
@@ -122,10 +125,40 @@ export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCo
         }),
       });
 
-      const data = await response.json();
+      let data: any = null;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (jsonErr) {
+          throw new Error('Failed to parse API response as JSON.');
+        }
+      } else {
+        const text = await response.text();
+        if (text.trim().startsWith('<')) {
+          throw new Error('The study sync server is currently busy or initializing. Please try again in a moment.');
+        } else {
+          throw new Error(`Server error (Status ${response.status}): ${text.slice(0, 100)}`);
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'API server returned an error');
+        let errMsg = 'API server returned an error';
+        if (data && data.error) {
+          try {
+            const parsedError = JSON.parse(data.error);
+            if (parsedError.error && parsedError.error.message) {
+              errMsg = parsedError.error.message;
+            } else if (parsedError.message) {
+              errMsg = parsedError.message;
+            } else {
+              errMsg = data.error;
+            }
+          } catch {
+            errMsg = data.error;
+          }
+        }
+        throw new Error(errMsg);
       }
 
       setAiResult(data);
@@ -384,6 +417,15 @@ export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCo
               })}
             </div>
           </div>
+
+          {/* Model Used Metadata Indicator */}
+          {aiResult.metadata?.modelUsed && (
+            <div className="flex justify-end px-1 -mt-2">
+              <span className="text-[9px] text-stone-400 font-mono">
+                Succeeded using model: <span className="font-bold text-[#A58D56]">{aiResult.metadata.modelUsed}</span>
+              </span>
+            </div>
+          )}
 
           {/* Commit Actions */}
           <div className="flex gap-2">

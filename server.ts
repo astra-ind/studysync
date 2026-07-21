@@ -70,39 +70,75 @@ When designing the schedule:
 6. Always provide a motivating, personal piece of advice in the 'advice' field. Speak to them as a friendly academic coach.
 7. Make sure you use standard, human labels (e.g. 'Math Exam Cramming', 'Calculus Overlap Slot', 'Chemistry Review'). Do not use pseudo-intellectual names. No telemetry.`;
 
-      const response = await activeAiClient.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              schedule: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    title: { type: Type.STRING, description: "Friendly name of the session" },
-                    type: { type: Type.STRING, description: "Must be 'free', 'studying', 'busy', or 'maybe'" },
-                    start: { type: Type.STRING, description: "Local date-time string without Z or offset, e.g., 2026-07-17T15:00:00" },
-                    end: { type: Type.STRING, description: "Local date-time string without Z or offset, e.g., 2026-07-17T17:00:00" },
-                    topic: { type: Type.STRING, description: "Optional subject or chapter details" },
-                    notes: { type: Type.STRING, description: "Optional notes about the goals of this session" }
+      const candidateModels = [
+        "gemini-3.5-flash",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.0-flash",
+        "gemini-2.5-pro"
+      ];
+
+      const errors: string[] = [];
+      let response = null;
+      let usedModel = "";
+
+      for (const modelName of candidateModels) {
+        try {
+          console.log(`Attempting schedule generation using model: ${modelName}`);
+          response = await activeAiClient.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: {
+              systemInstruction,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  schedule: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        title: { type: Type.STRING, description: "Friendly name of the session" },
+                        type: { type: Type.STRING, description: "Must be 'free', 'studying', 'busy', or 'maybe'" },
+                        start: { type: Type.STRING, description: "Local date-time string without Z or offset, e.g., 2026-07-17T15:00:00" },
+                        end: { type: Type.STRING, description: "Local date-time string without Z or offset, e.g., 2026-07-17T17:00:00" },
+                        topic: { type: Type.STRING, description: "Optional subject or chapter details" },
+                        notes: { type: Type.STRING, description: "Optional notes about the goals of this session" }
+                      },
+                      required: ["title", "type", "start", "end"]
+                    }
                   },
-                  required: ["title", "type", "start", "end"]
-                }
-              },
-              advice: { type: Type.STRING, description: "Encouraging, friendly commentary about how this plan helps them reach their goals" }
-            },
-            required: ["schedule", "advice"]
+                  advice: { type: Type.STRING, description: "Encouraging, friendly commentary about how this plan helps them reach their goals" }
+                },
+                required: ["schedule", "advice"]
+              }
+            }
+          });
+          
+          if (response && response.text) {
+            usedModel = modelName;
+            break; // Success!
           }
+        } catch (err: any) {
+          const errMsg = err.message || JSON.stringify(err);
+          console.warn(`Model ${modelName} failed:`, errMsg);
+          errors.push(`${modelName}: ${errMsg}`);
         }
-      });
+      }
+
+      if (!response) {
+        throw new Error(`All candidate Gemini models failed to generate content:\n${errors.join("\n")}`);
+      }
 
       const responseText = response.text || "{}";
       const data = JSON.parse(responseText);
+
+      // Inject model usage info into metadata for troubleshooting/clarity
+      if (typeof data === "object" && data !== null) {
+        data.metadata = { modelUsed: usedModel };
+      }
+
       res.json(data);
     } catch (err: any) {
       console.error("Gemini API error:", err);
