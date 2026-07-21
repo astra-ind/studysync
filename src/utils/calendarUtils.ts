@@ -11,8 +11,8 @@ export function expandEvents(
   const endMs = rangeEnd.getTime();
 
   events.forEach((event) => {
-    const origStart = new Date(event.start);
-    const origEnd = new Date(event.end);
+    const origStart = parseLocalDateTime(event.start);
+    const origEnd = parseLocalDateTime(event.end);
     const duration = origEnd.getTime() - origStart.getTime();
 
     if (event.recurrence === 'none') {
@@ -68,11 +68,35 @@ export function getLocalDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// Robust parser to ensure date-time strings are always parsed in user's local timezone consistently across all browsers
+export function parseLocalDateTime(dateStr: string): Date {
+  let cleanStr = dateStr;
+  const hasZ = cleanStr.endsWith('Z');
+  const hasOffset = /[+-]\d{2}:?\d{2}$/.test(cleanStr);
+  
+  if (hasZ || hasOffset) {
+    return new Date(cleanStr);
+  }
+
+  const match = cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:T|\s+)?(\d{2})?:?(\d{2})?:?(\d{2})?(?:\.\d+)?$/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1; // 0-indexed month
+    const day = parseInt(match[3], 10);
+    const hour = match[4] ? parseInt(match[4], 10) : 0;
+    const minute = match[5] ? parseInt(match[5], 10) : 0;
+    const second = match[6] ? parseInt(match[6], 10) : 0;
+    
+    return new Date(year, month, day, hour, minute, second);
+  }
+
+  return new Date(cleanStr);
+}
+
 // Parse timezone-adjusted dates
 export function getAdjustedDate(dateStr: string, timeStr: string, timezone: string): Date {
   // Use current system timezone or specified timezone to create a correct Date object
-  const date = new Date(`${dateStr}T${timeStr}`);
-  return date;
+  return parseLocalDateTime(`${dateStr}T${timeStr}`);
 }
 
 // 30-minute interval matching for a specific date
@@ -92,10 +116,10 @@ export function calculateSharedGrid(
   const grid: TimeInterval[] = [];
 
   // Parse day start/end in local timezone
-  const startOfDay = new Date(`${dateStr}T00:00:00`);
+  const startOfDay = parseLocalDateTime(`${dateStr}T00:00:00`);
   
   // Expand events for this day
-  const endOfDay = new Date(`${dateStr}T23:59:59`);
+  const endOfDay = parseLocalDateTime(`${dateStr}T23:59:59`);
   const activeA = expandEvents(eventsA, startOfDay, endOfDay);
   const activeB = expandEvents(eventsB, startOfDay, endOfDay);
 
@@ -108,15 +132,15 @@ export function calculateSharedGrid(
     const minStr = String(minute).padStart(2, '0');
     const timeStr = `${hourStr}:${minStr}`;
 
-    const slotStart = new Date(`${dateStr}T${timeStr}:00`);
+    const slotStart = parseLocalDateTime(`${dateStr}T${timeStr}:00`);
     const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
 
     // Helper to see if any event overlaps this 30-min slot
     const getStatus = (activeEvents: CalendarEvent[]): SlotType | 'none' => {
       let currentStatus: SlotType | 'none' = 'none';
       for (const event of activeEvents) {
-        const estart = new Date(event.start);
-        const eend = new Date(event.end);
+        const estart = parseLocalDateTime(event.start);
+        const eend = parseLocalDateTime(event.end);
         
         // Overlap condition
         if (estart < slotEnd && eend > slotStart) {
@@ -197,10 +221,10 @@ export function findMatches(
         const startHourMin = currentMatchStart.timeStr;
         // end time is endInterval's end time (start + 30 min)
         const startParts = startHourMin.split(':').map(Number);
-        const startDate = new Date(`${dateStr}T${startHourMin}:00`);
+        const startDate = parseLocalDateTime(`${dateStr}T${startHourMin}:00`);
         
         const endParts = endInterval.timeStr.split(':').map(Number);
-        const endDate = new Date(`${dateStr}T${endInterval.timeStr}:00`);
+        const endDate = parseLocalDateTime(`${dateStr}T${endInterval.timeStr}:00`);
         endDate.setMinutes(endDate.getMinutes() + 30); // add 30 min for the end of the slot
 
         let type: 'free' | 'studying' | 'mixed' = 'free';
@@ -314,8 +338,8 @@ export function getMonthDays(date: Date, events: CalendarEvent[]): CalendarDay[]
     const dayStr = getLocalDateString(dayDate);
 
     // Expand events for this specific day
-    const dayStart = new Date(`${dayStr}T00:00:00`);
-    const dayEnd = new Date(`${dayStr}T23:59:59`);
+    const dayStart = parseLocalDateTime(`${dayStr}T00:00:00`);
+    const dayEnd = parseLocalDateTime(`${dayStr}T23:59:59`);
     const dayEvents = expandEvents(events, dayStart, dayEnd);
 
     days.push({

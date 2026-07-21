@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { CalendarEvent, SlotType } from '../types';
-import { getLocalDateString, getMonthDays, expandEvents } from '../utils/calendarUtils';
+import { getLocalDateString, getMonthDays, expandEvents, parseLocalDateTime } from '../utils/calendarUtils';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Filter, Search, BookOpen, CheckSquare } from 'lucide-react';
 
 interface PersonalCalendarProps {
@@ -341,7 +341,7 @@ export default function PersonalCalendar({
 
                 // Filter events starting on this column's date
                 const colEvents = filteredExpandedEvents.filter((e) => {
-                  return getLocalDateString(new Date(e.start)) === colDateStr;
+                  return getLocalDateString(parseLocalDateTime(e.start)) === colDateStr;
                 });
 
                 return (
@@ -373,8 +373,8 @@ export default function PersonalCalendar({
 
                     {/* Column absolute events */}
                     {colEvents.map((e) => {
-                      const startD = new Date(e.start);
-                      const endD = new Date(e.end);
+                      const startD = parseLocalDateTime(e.start);
+                      const endD = parseLocalDateTime(e.end);
 
                       const startMin = startD.getHours() * 60 + startD.getMinutes();
                       const endMin = endD.getHours() * 60 + endD.getMinutes();

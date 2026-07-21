@@ -119,7 +119,8 @@ export default function MatchFinder({ currentUser, partner, events }: MatchFinde
     if (dateStr === today) return 'Today';
     if (dateStr === tomorrow) return 'Tomorrow';
     
-    const d = new Date(`${dateStr}T00:00:00`);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
     return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
   };
 

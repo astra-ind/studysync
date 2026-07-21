@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { GoogleGenAI, Type } from '@google/genai';
 import { HardcodedUser } from '../config';
 import { db, collection, addDoc, doc, setDoc, onSnapshot } from '../lib/firebase';
 import { Sparkles, Calendar, Send, CheckCircle2, RotateCw, Check, Loader2, Info, Sliders, Lock } from 'lucide-react';
@@ -95,11 +96,35 @@ export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCo
     const offsetRegex = /[+-]\d{2}:\d{2}$/;
     cleanStr = cleanStr.replace(offsetRegex, '');
 
+    // Robust local parsing of "YYYY-MM-DDTHH:mm:ss" to avoid differences between browser engines
+    const match = cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/) 
+               || cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/)
+               || cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
+               || cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+    
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1; // 0-indexed month
+      const day = parseInt(match[3], 10);
+      const hour = parseInt(match[4], 10);
+      const minute = parseInt(match[5], 10);
+      const second = match[6] ? parseInt(match[6], 10) : 0;
+      
+      const d = new Date(year, month, day, hour, minute, second);
+      return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+    }
+
     const d = new Date(cleanStr);
     return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
   };
 
-  // Submit request to Express API route
+  // Helper to format Date timezone-naive for stable fallback blocks
+  const formatTimezoneNaive = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  // Submit request to Express API route or run client-side Gemini
   const handleGeneratePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!goalInput.trim()) return;
@@ -109,80 +134,224 @@ export default function AISchedulerCoach({ currentUser, partner }: AISchedulerCo
     setIsProgrammed(false);
     setApiError(null);
 
-    try {
-      const response = await fetch('/api/scheduler/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: goalInput.trim(),
-          currentLocalDate: new Date().toISOString().slice(0, 10),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          userName: currentUser.name,
-          customApiKey: customApiKey.trim() || undefined,
-          personalContext: personalContext.trim() || undefined,
-        }),
-      });
+    // Calculate actual local YYYY-MM-DD date rather than UTC slice
+    const localDateObj = new Date();
+    const localYear = localDateObj.getFullYear();
+    const localMonth = String(localDateObj.getMonth() + 1).padStart(2, '0');
+    const localDay = String(localDateObj.getDate()).padStart(2, '0');
+    const localDateStr = `${localYear}-${localMonth}-${localDay}`;
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-      let data: any = null;
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch (jsonErr) {
-          throw new Error('Failed to parse API response as JSON.');
-        }
-      } else {
-        const text = await response.text();
-        if (text.trim().startsWith('<')) {
-          throw new Error('The study sync server is currently busy or initializing. Please try again in a moment.');
-        } else {
-          throw new Error(`Server error (Status ${response.status}): ${text.slice(0, 100)}`);
-        }
-      }
+    let successData: AIResponse | null = null;
+    let fallbackToClient = false;
 
-      if (!response.ok) {
-        let errMsg = 'API server returned an error';
-        if (data && data.error) {
+    // Detect if we are running in a static web environment with no active backend
+    const isStaticDeployment = window.location.hostname.includes('netlify.app') || 
+                               window.location.hostname.includes('vercel.app') || 
+                               window.location.hostname.includes('github.io');
+
+    if (isStaticDeployment && !customApiKey.trim()) {
+      setApiError("This site is deployed on Netlify (static hosting) which doesn't have an active Express backend. To use the AI Coach here, please open settings (the gear icon above) and enter your own Google Gemini API Key!");
+      setIsLoading(false);
+      return;
+    }
+
+    // Try server first if we are not strictly forced or on a static environment with a custom key
+    if (!isStaticDeployment || !customApiKey.trim()) {
+      try {
+        const response = await fetch('/api/scheduler/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: goalInput.trim(),
+            currentLocalDate: localDateStr,
+            timezone: userTimezone,
+            userName: currentUser.name,
+            customApiKey: customApiKey.trim() || undefined,
+            personalContext: personalContext.trim() || undefined,
+          }),
+        });
+
+        let data: any = null;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
           try {
-            const parsedError = JSON.parse(data.error);
-            if (parsedError.error && parsedError.error.message) {
-              errMsg = parsedError.error.message;
-            } else if (parsedError.message) {
-              errMsg = parsedError.message;
-            } else {
-              errMsg = data.error;
-            }
-          } catch {
-            errMsg = data.error;
+            data = await response.json();
+          } catch (jsonErr) {
+            throw new Error('Failed to parse API response as JSON.');
+          }
+        } else {
+          const text = await response.text();
+          if (text.trim().startsWith('<')) {
+            // Netlify/static hosting returns HTML (404/index.html fallback) for routes it doesn't recognize
+            fallbackToClient = true;
+          } else {
+            throw new Error(`Server error (Status ${response.status}): ${text.slice(0, 100)}`);
           }
         }
-        throw new Error(errMsg);
+
+        if (!fallbackToClient) {
+          if (!response.ok) {
+            let errMsg = 'API server returned an error';
+            if (data && data.error) {
+              try {
+                const parsedError = JSON.parse(data.error);
+                if (parsedError.error && parsedError.error.message) {
+                  errMsg = parsedError.error.message;
+                } else if (parsedError.message) {
+                  errMsg = parsedError.message;
+                } else {
+                  errMsg = data.error;
+                }
+              } catch {
+                errMsg = data.error;
+              }
+            }
+            throw new Error(errMsg);
+          }
+
+          successData = data;
+        }
+      } catch (err: any) {
+        console.warn('Backend scheduler route failed, checking client-side capability:', err);
+        if (customApiKey.trim()) {
+          fallbackToClient = true;
+        } else {
+          setApiError(err.message || 'Failed to communicate with AI Coach');
+          setIsLoading(false);
+          return;
+        }
+      }
+    } else {
+      fallbackToClient = true;
+    }
+
+    if (fallbackToClient) {
+      const apiKeyToUse = customApiKey.trim();
+      if (!apiKeyToUse) {
+        setApiError("The server backend is unavailable on this host. Please open settings and enter your custom Gemini API key to utilize the AI study planner here.");
+        setIsLoading(false);
+        return;
       }
 
-      setAiResult(data);
-    } catch (err: any) {
-      console.error('Error generating study schedule:', err);
-      setApiError(err.message || 'Failed to communicate with AI Coach');
-      
-      // Fallback advice so it never crashes but notifies they can fix the key
+      try {
+        const clientAi = new GoogleGenAI({
+          apiKey: apiKeyToUse,
+        });
+
+        let systemInstruction = `You are the AI Study Planner Coach for "Study Sync", a real-time ledger diary shared by "A" and "G".
+Your job is to design a personalized, cohesive study schedule based on the user's goals, availability, and plan.
+You can create "daily", "weekly", or "monthly" blocks.
+The user's local date/time is ${localDateStr} in timezone ${userTimezone}. The user talking to you is "${currentUser.name}".`;
+
+        if (personalContext && personalContext.trim()) {
+          systemInstruction += `\n\nUSER'S PERMANENT PERSONAL PREFERENCES AND STUDY CONTEXT (Adhere strictly to these):
+${personalContext.trim()}`;
+        }
+
+        systemInstruction += `\n\nCRITICAL RULE:
+Generate schedules ONLY for the current user talking to you (${currentUser.name}). Do NOT generate or suggest schedule blocks for the other user. You can align or match with the other user's free slots if helpful, but the 'schedule' array you return must contain ONLY events for "${currentUser.name}".
+
+When designing the schedule:
+1. Try to schedule "Focused Studying" blocks ('studying') or "Free Space" blocks ('free') when they want to collaborate or sync.
+2. Keep it balanced. Don't schedule 24 hours of straight studying. Include breaks.
+3. Every slot must have a start and end ISO time. Use the anchor date ${localDateStr} to calculate dates correctly (e.g., today, tomorrow, this week).
+4. All date-times for 'start' and 'end' MUST be generated as timezone-naive local date-time strings (e.g., "YYYY-MM-DDTHH:MM:SS" without any trailing "Z" or offset).
+5. All event types MUST be exactly one of: 'free', 'studying', 'busy', 'maybe'.
+6. Always provide a motivating, personal piece of advice in the 'advice' field. Speak to them as a friendly academic coach.
+7. Make sure you use standard, human labels (e.g. 'Math Exam Cramming', 'Calculus Overlap Slot', 'Chemistry Review'). Do not use pseudo-intellectual names. No telemetry.`;
+
+        const candidateModels = [
+          "gemini-2.5-flash",
+          "gemini-2.0-flash",
+          "gemini-1.5-flash",
+        ];
+
+        let responseText = '';
+        let usedModel = '';
+
+        for (const modelName of candidateModels) {
+          try {
+            const response = await clientAi.models.generateContent({
+              model: modelName,
+              contents: goalInput.trim(),
+              config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    schedule: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          title: { type: Type.STRING, description: "Friendly name of the session" },
+                          type: { type: Type.STRING, description: "Must be 'free', 'studying', 'busy', or 'maybe'" },
+                          start: { type: Type.STRING, description: "Local date-time string without Z or offset, e.g., 2026-07-17T15:00:00" },
+                          end: { type: Type.STRING, description: "Local date-time string without Z or offset, e.g., 2026-07-17T17:00:00" },
+                          topic: { type: Type.STRING, description: "Optional subject or chapter details" },
+                          notes: { type: Type.STRING, description: "Optional notes about the goals of this session" }
+                        },
+                        required: ["title", "type", "start", "end"]
+                      }
+                    },
+                    advice: { type: Type.STRING, description: "Encouraging, friendly commentary about how this plan helps them reach their goals" }
+                  },
+                  required: ["schedule", "advice"]
+                }
+              }
+            });
+
+            if (response && response.text) {
+              responseText = response.text;
+              usedModel = modelName;
+              break;
+            }
+          } catch (modelErr) {
+            console.warn(`Direct model ${modelName} attempt failed:`, modelErr);
+          }
+        }
+
+        if (!responseText) {
+          throw new Error("All tried client-side Gemini models failed to generate content. Check your Custom API Key.");
+        }
+
+        const data = JSON.parse(responseText);
+        if (typeof data === "object" && data !== null) {
+          data.metadata = { modelUsed: `${usedModel} (Direct Client)` };
+        }
+        successData = data;
+      } catch (clientErr: any) {
+        console.error('Client-side generation failure:', clientErr);
+        setApiError(`Client-Side AI Generation Failed: ${clientErr.message || 'Verification failed'}`);
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    if (successData) {
+      setAiResult(successData);
+    } else {
+      // Setup timezone-safe fallback mock data to prevent crashes
       setAiResult({
         schedule: [
           {
             title: `Study Session: ${currentUser.name}`,
             type: 'studying',
-            start: new Date().toISOString(),
-            end: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+            start: formatTimezoneNaive(new Date()),
+            end: formatTimezoneNaive(new Date(Date.now() + 2 * 60 * 60 * 1000)),
             topic: 'Core Review',
             notes: 'AI fallback block. Check your custom API Key / settings.',
           }
         ],
-        advice: `⚠️ AI Coach Warning: ${err.message || 'The scheduling engine returned an error'}. Please configure your custom Gemini API Key in settings or check the network connection.`,
+        advice: `⚠️ AI Coach Warning: The scheduling engine failed to connect to Gemini. Please configure your custom Gemini API Key in settings or check your connection.`,
       });
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   };
 
   // Program schedule directly into Firestore

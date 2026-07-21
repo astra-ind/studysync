@@ -109,8 +109,12 @@ export default function EventModal({
     e.preventDefault();
     if (!title.trim()) return;
 
-    const startISO = new Date(`${date}T${startTime}:00`).toISOString();
-    const endISO = new Date(`${date}T${endTime}:00`).toISOString();
+    const [year, month, day] = date.split('-').map(Number);
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+
+    const startISO = new Date(year, month - 1, day, startH, startM, 0).toISOString();
+    const endISO = new Date(year, month - 1, day, endH, endM, 0).toISOString();
 
     onSave({
       userId,
